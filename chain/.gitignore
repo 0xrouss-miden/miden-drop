@@ -1,0 +1,13 @@
+# Cargo build output
+/target/
+**/*.rs.bk
+
+# Compiled Miden libraries
+*.masl
+
+# Editor and OS files
+.vscode/
+.code/
+.idea/
+*DS_Store
+*.iml

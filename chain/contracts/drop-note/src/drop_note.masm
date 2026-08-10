@@ -1,0 +1,52 @@
+use miden::protocol::active_account
+use miden::protocol::account_id
+use miden::protocol::active_note
+use miden::protocol::tx
+use miden::standards::wallets::basic->basic_wallet
+
+const ERR_DROP_NOTE_UNEXPECTED_STORAGE="Miden Drop note expects exactly one storage item"
+const ERR_DROP_NOTE_EXPIRED="Miden Drop note expired and can only be reclaimed by its sender"
+
+#! Miden Drop bearer note.
+#!
+#! Before expiration, transfers every asset held by this note to any consuming account. At and
+#! after expiration, only the note sender can consume it and recover the assets.
+#!
+#! Requires the consuming account to expose the standard Basic Wallet `receive_asset` procedure.
+#!
+#! Note storage:
+#! - expiration_block: block height at which only the sender may consume the note. Zero disables
+#!   expiration.
+#!
+#! Inputs:  []
+#! Outputs: []
+@note_script
+pub proc claim
+    # Load and validate the optional expiration block from note storage.
+    push.0 exec.active_note::get_storage
+    eq.1 assert.err=ERR_DROP_NOTE_UNEXPECTED_STORAGE
+    mem_load.0
+    # => [expiration_block]
+
+    # Zero means the note never expires.
+    dup eq.0
+    if.true
+        drop
+        # => []
+    else
+        # At the expiration block and afterwards, only the original sender may consume the note.
+        exec.tx::get_block_number
+        # => [current_block, expiration_block]
+        lte
+        # => [is_expired]
+
+        if.true
+            exec.active_account::get_id
+            exec.active_note::get_sender
+            exec.account_id::is_equal assert.err=ERR_DROP_NOTE_EXPIRED
+            # => []
+        end
+    end
+
+    exec.basic_wallet::add_assets_to_account
+end

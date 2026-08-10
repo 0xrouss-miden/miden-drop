@@ -1,0 +1,17 @@
+{
+  "hooks": {
+    "PostToolUse": [
+      {
+        "matcher": "Edit|Write",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "\"$CLAUDE_PROJECT_DIR\"/.claude/hooks/test-drop-note.sh",
+            "timeout": 300,
+            "statusMessage": "Testing the modified Miden Drop note..."
+          }
+        ]
+      }
+    ]
+  }
+}

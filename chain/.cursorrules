@@ -1,0 +1,32 @@
+# Miden Drop chain rules
+
+This workspace is exclusively for the Miden Drop bearer note.
+
+## Files
+
+- Contract: `contracts/drop-note/src/drop_note.masm`
+- Contract documentation: `contracts/drop-note/README.md`
+- Tests: `integration/tests/drop_note_test.rs`
+
+Do not add unrelated account components, binaries, client stores, or generic contract scaffolding
+without an explicit product requirement.
+
+## Semantics
+
+- Storage is exactly `[expiration_block]`.
+- Zero means no expiration.
+- Before expiration, possession of the private note data authorizes the claim.
+- At and after expiration, only the note sender may consume it.
+- Move assets through the standard Basic Wallet library.
+- Treat the exact expiration block as expired.
+- Never describe reclaim as automatic.
+
+## Validation
+
+```sh
+cargo fmt --manifest-path integration/Cargo.toml -- --check
+cargo test -p integration --release
+```
+
+The MASM note is compiled by the integration test through `NoteBuilder::code`; it has no separate
+contract build command.

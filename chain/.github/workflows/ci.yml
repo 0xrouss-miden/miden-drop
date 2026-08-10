@@ -1,0 +1,23 @@
+name: CI
+
+on:
+  push:
+    branches:
+    - main
+  pull_request:
+
+jobs:
+  drop_note_tests:
+    name: Test Miden Drop note
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v4
+    - name: Install Rust
+      run: |
+        rustup update --no-self-update
+        rustc --version
+    - name: Check formatting
+      run: cargo fmt --manifest-path integration/Cargo.toml -- --check
+    - name: Run drop-note tests
+      run: cargo test -p integration --release
