@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { IBM_Plex_Mono, Manrope } from "next/font/google";
+import AppShell from "./app-shell";
 import WalletProviderLoader from "./wallet-provider-loader";
 import "./globals.css";
 
@@ -18,7 +19,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
     <html lang="en" data-scroll-behavior="smooth" className={`${manrope.variable} ${plexMono.variable}`}>
       <body>
         <span className="design-contract" aria-hidden="true" data-design-contract={designContract} dangerouslySetInnerHTML={{ __html: `<!-- ${designContract} -->` }} />
-        <WalletProviderLoader>{children}</WalletProviderLoader>
+        <WalletProviderLoader><AppShell>{children}</AppShell></WalletProviderLoader>
       </body>
     </html>
   );
