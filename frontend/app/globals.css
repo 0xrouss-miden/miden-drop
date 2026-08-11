@@ -600,8 +600,8 @@ a { color: inherit; text-decoration: none; }
 .claim-page {
   width: min(100%, 760px);
   min-height: auto;
-  margin: auto;
-  padding: clamp(48px, 7vh, 84px) 22px;
+  margin: 0 auto;
+  padding: clamp(32px, 5vh, 56px) 22px;
   display: block;
 }
 .claim-task {

@@ -115,7 +115,6 @@ export default function ClaimPage() {
   return (
     <main className="claim-page">
       <section className="claim-task">
-        <Link className="back-link" href="/"><Icon name="back" size={17} /> Back to Miden Drop</Link>
         <h1>{phase === "claimed" ? "Drop claimed" : "Claim this drop"}<span>.</span></h1>
         {(error || connectionError) && <div className="error-banner" role="alert">{error || connectionError}</div>}
 
