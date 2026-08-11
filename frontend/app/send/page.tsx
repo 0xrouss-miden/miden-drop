@@ -29,7 +29,7 @@ type BalanceState =
   | { status: "ready"; address: string; assets: Asset[] };
 
 export default function SendPage() {
-  const [amount, setAmount] = useState("125.00");
+  const [amount, setAmount] = useState("");
   const [tokenId, setTokenId] = useState<string>(MIDEN_TOKENS[0].faucetId);
   const [amountTouched, setAmountTouched] = useState(false);
   const [expirationDays, setExpirationDays] = useState(7);
@@ -191,7 +191,6 @@ export default function SendPage() {
       {(error || connectionError) && <div className="error-banner" role="alert">{error || connectionError}</div>}
       <section className="send-page">
         <div className="hero-copy send-intro">
-          <Link className="back-link" href="/"><Icon name="back" size={17} /> Back to home</Link>
           <h1>Send a drop<span>.</span></h1>
         </div>
         <div className="composer-stage">
@@ -204,7 +203,7 @@ export default function SendPage() {
                 </span>
               </div>
               <div className="amount-input-row">
-                <input id="drop-amount" inputMode="decimal" value={amount} onBlur={() => setAmountTouched(true)} onChange={(event) => { setAmount(event.target.value); setAmountTouched(true); }} aria-label="Amount to send" aria-invalid={amountTouched && !parsedAmount.units} aria-describedby="amount-error" />
+                <input id="drop-amount" inputMode="decimal" value={amount} placeholder="0.00" onBlur={() => setAmountTouched(true)} onChange={(event) => { setAmount(event.target.value); setAmountTouched(true); }} aria-label="Amount to send" aria-invalid={amountTouched && !parsedAmount.units} aria-describedby="amount-error" />
                 <span className="token-select">
                   <span aria-hidden="true">{selectedToken.symbol.slice(0, 1)}</span>
                   <select value={tokenId} onChange={(event) => { setTokenId(event.target.value); setAmountTouched(true); }} aria-label="Token to send">

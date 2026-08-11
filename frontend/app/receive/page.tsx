@@ -27,7 +27,6 @@ export default function ReceivePage() {
     <main className="receive-page">
       <section className="receive-section">
         <div className="section-intro">
-          <Link className="back-link" href="/"><Icon name="back" size={17} /> Back to home</Link>
           <h1>Receive a drop<span>.</span></h1>
         </div>
         {error && <div className="error-banner" role="alert">{error}</div>}
