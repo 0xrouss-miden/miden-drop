@@ -16,6 +16,6 @@ describe("token amounts", () => {
   });
 
   it("converts days into an absolute expiration block", () => {
-    expect(expirationBlockFromDays(100, 7, 17_280)).toBe(121_060);
+    expect(expirationBlockFromDays(100, 7, 28_800)).toBe(201_700);
   });
 });

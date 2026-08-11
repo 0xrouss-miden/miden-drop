@@ -25,4 +25,4 @@ export function findMidenToken(faucetId: string) {
   return MIDEN_TOKENS.find((token) => token.faucetId === faucetId);
 }
 
-export const MIDEN_BLOCKS_PER_DAY = 17_280;
+export const MIDEN_BLOCKS_PER_DAY = 28_800;
