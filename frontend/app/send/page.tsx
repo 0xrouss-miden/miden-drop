@@ -58,19 +58,27 @@ export default function SendPage() {
   }, [normalizedAmount, selectedToken.decimals]);
   const busy = phase === "creating" || phase === "uploading";
   const availableBalance = useMemo(() => {
-    if (!connected) return { label: "Connect wallet to view", fullLabel: "Connect wallet to view" };
-    if (balanceState.status === "idle" || balanceState.address !== address) return { label: "Checking…", fullLabel: "Checking…" };
-    if (balanceState.status === "unavailable") return { label: "Unavailable", fullLabel: "Unavailable" };
+    if (!connected) return { label: "Connect wallet to view", fullLabel: "Connect wallet to view", units: null };
+    if (balanceState.status === "idle" || balanceState.address !== address) return { label: "Checking…", fullLabel: "Checking…", units: null };
+    if (balanceState.status === "unavailable") return { label: "Unavailable", fullLabel: "Unavailable", units: null };
 
     const asset = balanceState.assets.find((candidate) => candidate.faucetId === selectedToken.faucetId);
     try {
-      const formatted = formatDecimalUnits(BigInt(asset?.amount ?? "0"), selectedToken.decimals);
+      const units = BigInt(asset?.amount ?? "0");
+      const formatted = formatDecimalUnits(units, selectedToken.decimals);
       const label = `${formatted} ${selectedToken.symbol}`;
-      return { label, fullLabel: label };
+      return { label, fullLabel: label, units };
     } catch {
-      return { label: "Unavailable", fullLabel: "Unavailable" };
+      return { label: "Unavailable", fullLabel: "Unavailable", units: null };
     }
   }, [address, balanceState, connected, selectedToken]);
+  const balanceError = parsedAmount.units !== null
+    && availableBalance.units !== null
+    && parsedAmount.units > availableBalance.units
+    ? `You only have ${availableBalance.label} available.`
+    : "";
+  const amountError = parsedAmount.error || balanceError;
+  const amountIsValid = parsedAmount.units !== null && !amountError;
 
   useEffect(() => {
     if (!connected || !address || !requestAssets) {
@@ -106,7 +114,7 @@ export default function SendPage() {
     event.preventDefault();
     setAmountTouched(true);
     setError(null);
-    if (!parsedAmount.units) return;
+    if (!amountIsValid || parsedAmount.units === null) return;
     if (!connected || !address || !requestTransaction || !waitForTransaction) {
       await connectWallet();
       return;
@@ -203,7 +211,7 @@ export default function SendPage() {
                 </span>
               </div>
               <div className="amount-input-row">
-                <input id="drop-amount" inputMode="decimal" value={amount} placeholder="0.00" onBlur={() => setAmountTouched(true)} onChange={(event) => { setAmount(event.target.value); setAmountTouched(true); }} aria-label="Amount to send" aria-invalid={amountTouched && !parsedAmount.units} aria-describedby="amount-error" />
+                <input id="drop-amount" inputMode="decimal" value={amount} placeholder="0.00" onBlur={() => setAmountTouched(true)} onChange={(event) => { setAmount(event.target.value); setAmountTouched(true); }} aria-label="Amount to send" aria-invalid={amountTouched && !amountIsValid} aria-describedby="amount-error" />
                 <span className="token-select">
                   <span aria-hidden="true">{selectedToken.symbol.slice(0, 1)}</span>
                   <select value={tokenId} onChange={(event) => { setTokenId(event.target.value); setAmountTouched(true); }} aria-label="Token to send">
@@ -211,13 +219,13 @@ export default function SendPage() {
                   </select>
                 </span>
               </div>
-              <p className="field-error" id="amount-error" aria-live="polite">{amountTouched && !parsedAmount.units ? parsedAmount.error : ""}</p>
+              <p className="field-error" id="amount-error" aria-live="polite">{amountTouched && !amountIsValid ? amountError : ""}</p>
             </div>
             <div className="composer-options">
               <label><span>Expires after</span><select value={expirationDays} onChange={(event) => setExpirationDays(Number(event.target.value))} aria-label="Drop expiration">{EXPIRATIONS.map((option) => <option key={option.days} value={option.days}>{option.label}</option>)}</select></label>
               <label><span>Message</span><input value={message} maxLength={42} onChange={(event) => setMessage(event.target.value)} placeholder="Optional" /></label>
             </div>
-            <button className="primary-button composer-submit" type="submit" disabled={!parsedAmount.units || busy || connectionPending} aria-busy={busy}>
+            <button className="primary-button composer-submit" type="submit" disabled={!amountIsValid || busy || connectionPending} aria-busy={busy}>
               <span>{phase === "creating" ? "Confirming private note…" : phase === "uploading" ? "Securing private link…" : connected ? "Create private link" : connectionPending ? "Connecting wallet…" : "Connect wallet to create"}</span>
               <Icon name={busy ? "lock" : "arrow"} />
             </button>
