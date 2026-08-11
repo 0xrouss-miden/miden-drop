@@ -1,6 +1,6 @@
-# Miden Drop price note
+# Miden Drop bearer note
 
-`src/drop_note.masm` defines the private, price-gated bearer note used by Miden Drop.
+`src/drop_note.masm` defines the private bearer note used by Miden Drop, with optional price gating.
 
 The note uses one script for both supported Pragma pairs. Its four storage items parameterize each
 individual drop:
@@ -8,13 +8,14 @@ individual drop:
 | Index | Value              | Meaning                                           |
 |------:|--------------------|---------------------------------------------------|
 | 0     | `recovery_block`   | Sender-only recovery begins at this block         |
-| 1     | `pair_prefix`      | `1` for BTC/USD; `2` for ETH/USD                  |
-| 2     | `pair_suffix`      | `0` for both supported pairs                      |
-| 3     | `raw_target_price` | USD target multiplied by `100_000_000`            |
+| 1     | `pair_prefix`      | `0` for none; `1` for BTC/USD; `2` for ETH/USD    |
+| 2     | `pair_suffix`      | `0` for none and both supported pairs             |
+| 3     | `raw_target_price` | `0` for none; otherwise USD multiplied by `10^8`  |
 
 Before `recovery_block`, the original sender account is explicitly rejected. Any other account with
-the complete private note data may claim only if Pragma returns a fresh, tracked median and
-`median_price >= raw_target_price`.
+the complete private note data may claim. When the three Oracle fields are non-zero/selected, the
+claim additionally requires a fresh, tracked Pragma median with
+`median_price >= raw_target_price`. When all three fields are zero, no foreign-account call occurs.
 
 At and after `recovery_block`, the Oracle call is skipped and only the original sender can consume
 the note. Recovery is not automatic; the sender must submit the consuming transaction.

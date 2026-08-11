@@ -69,6 +69,14 @@ async fn recipient_can_claim_btc_drop_at_or_above_target() -> anyhow::Result<()>
 }
 
 #[tokio::test]
+async fn recipient_can_claim_without_oracle_condition() -> anyhow::Result<()> {
+    let tx = execute_price_drop(Consumer::Recipient, 0, 0, 0, 0, false).await?;
+
+    assert_received_amount(&tx, DROP_AMOUNT);
+    Ok(())
+}
+
+#[tokio::test]
 async fn recipient_can_claim_eth_drop_at_or_above_target() -> anyhow::Result<()> {
     let tx = execute_price_drop(
         Consumer::Recipient,
@@ -123,6 +131,13 @@ async fn unsupported_pair_is_rejected_before_oracle_execution() {
 }
 
 #[tokio::test]
+async fn partial_oracle_condition_is_rejected() {
+    let result = execute_price_drop(Consumer::Recipient, 0, 0, 0, BTC_TARGET, false).await;
+
+    result.expect_err("a partially configured Oracle condition was accepted");
+}
+
+#[tokio::test]
 async fn sender_cannot_claim_before_recovery_block() {
     let result = execute_price_drop(
         Consumer::Sender,
@@ -157,9 +172,9 @@ async fn sender_can_recover_at_recovery_block_without_oracle() -> anyhow::Result
     let tx = execute_price_drop(
         Consumer::Sender,
         RECOVERY_BLOCK,
-        ETH_USD_PREFIX,
-        USD_SUFFIX,
-        ETH_TARGET,
+        0,
+        0,
+        0,
         false,
     )
     .await?;

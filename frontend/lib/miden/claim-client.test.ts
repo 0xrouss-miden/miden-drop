@@ -6,6 +6,9 @@ const NOTE_ID = `0x${"ab".repeat(32)}`;
 const FAUCET_ID = "mtst1test-faucet";
 const RECOVERY_BLOCK = 100;
 const RAW_TARGET = BigInt("6500000000000");
+const storageState = vi.hoisted(() => ({
+  current: [BigInt(100), BigInt(1), BigInt(0), BigInt("6500000000000")],
+}));
 
 function freeableId(value: string) {
   return { toString: () => value, free: vi.fn() };
@@ -36,12 +39,7 @@ vi.mock("@miden-sdk/miden-sdk/lazy", () => {
     recipient() {
       return {
         storage: () => ({
-          items: () => [
-            BigInt(RECOVERY_BLOCK),
-            BigInt(1),
-            BigInt(0),
-            RAW_TARGET,
-          ].map((value) => ({ asInt: () => value, free: vi.fn() })),
+          items: () => storageState.current.map((value) => ({ asInt: () => value, free: vi.fn() })),
           free: vi.fn(),
         }),
         free: vi.fn(),
@@ -118,7 +116,10 @@ function envelope(bytes: Uint8Array): DropEnvelopeV1 {
 }
 
 describe("claimMidenDrop note payloads", () => {
-  beforeEach(() => vi.clearAllMocks());
+  beforeEach(() => {
+    vi.clearAllMocks();
+    storageState.current = [BigInt(RECOVERY_BLOCK), BigInt(1), BigInt(0), RAW_TARGET];
+  });
 
   it("imports an authenticated NoteFile and consumes the exact complete note bytes", async () => {
     let importedBytes: Uint8Array | undefined;
@@ -171,5 +172,21 @@ describe("claimMidenDrop note payloads", () => {
 
     expect(importPrivateNote).not.toHaveBeenCalled();
     expect(requestTransaction).not.toHaveBeenCalled();
+  });
+
+  it("accepts a note with no Oracle condition when all condition storage fields are zero", async () => {
+    storageState.current = [BigInt(RECOVERY_BLOCK), BigInt(0), BigInt(0), BigInt(0)];
+    const importPrivateNote = vi.fn().mockResolvedValue(NOTE_ID);
+    const requestTransaction = vi.fn().mockResolvedValue("tx-plain");
+    const waitForTransaction = vi.fn().mockResolvedValue({});
+    const conditioned = envelope(new Uint8Array([1, 7, 9]));
+    const plain: DropEnvelopeV1 = { ...conditioned };
+    delete plain.pricePair;
+    delete plain.rawTargetPrice;
+
+    await expect(claimMidenDrop(
+      { importPrivateNote, requestTransaction, waitForTransaction },
+      plain,
+    )).resolves.toBe("tx-plain");
   });
 });

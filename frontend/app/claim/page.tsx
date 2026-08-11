@@ -16,7 +16,7 @@ import { Icon } from "../ui";
 import { useWalletConnection } from "../wallet-connection";
 
 type ClaimPhase = "loading" | "ready" | "claiming" | "claimed" | "invalid" | "missing" | "failed";
-type ClaimDetails = { amount: string; symbol: string; expirationBlock: number; message?: string; expired: boolean; pricePair: string; targetPrice: string };
+type ClaimDetails = { amount: string; symbol: string; expirationBlock: number; message?: string; expired: boolean; pricePair?: string; targetPrice?: string };
 
 export default function ClaimPage() {
   const [phase, setPhase] = useState<ClaimPhase>("loading");
@@ -42,9 +42,11 @@ export default function ClaimPage() {
         const decrypted = await decryptDropEnvelope(secret.key, encrypted.nonce, encrypted.ciphertext);
         const token = findMidenToken(decrypted.faucetId);
         if (!token) throw new Error("This drop uses an unsupported token.");
-        const pricePair = findMidenPricePair(decrypted.pricePair);
-        if (!pricePair) throw new Error("This drop uses an unsupported price pair.");
-        const rawTargetPrice = BigInt(decrypted.rawTargetPrice);
+        const pricePair = decrypted.pricePair ? findMidenPricePair(decrypted.pricePair) : undefined;
+        if (decrypted.pricePair && !pricePair) throw new Error("This drop uses an unsupported price pair.");
+        const targetPrice = pricePair && decrypted.rawTargetPrice
+          ? formatMidenTargetPrice(BigInt(decrypted.rawTargetPrice), pricePair)
+          : undefined;
         const currentBlock = await getCurrentMidenBlock().catch(() => 0);
         if (cancelled) return;
         envelopeRef.current = decrypted;
@@ -55,8 +57,7 @@ export default function ClaimPage() {
           expirationBlock: decrypted.expirationBlock,
           message: decrypted.message,
           expired: currentBlock >= decrypted.expirationBlock,
-          pricePair: pricePair.id,
-          targetPrice: formatMidenTargetPrice(rawTargetPrice, pricePair),
+          ...(pricePair && targetPrice ? { pricePair: pricePair.id, targetPrice } : {}),
         });
         setPhase("ready");
       } catch (loadError) {
@@ -145,16 +146,16 @@ export default function ClaimPage() {
             </div>
             <dl className="detail-list">
               <div><dt>From</dt><dd>Private sender</dd></div>
-              <div><dt>Claim condition</dt><dd>{details.pricePair} ≥ {details.targetPrice}</dd></div>
+              <div><dt>Claim condition</dt><dd>{details.pricePair ? `${details.pricePair} ≥ ${details.targetPrice}` : "Bearer link · no Oracle"}</dd></div>
               <div><dt>Network</dt><dd><span className="status-dot" />Miden Testnet</dd></div>
               <div><dt>Sender recovery</dt><dd>{details.expired ? "Open now" : `Block ${details.expirationBlock.toLocaleString()}`}</dd></div>
               <div><dt>Message</dt><dd>{details.message || "No message"}</dd></div>
             </dl>
             <button className="primary-button claim-button" type="button" onClick={claimDrop} disabled={phase === "claiming" || pending} aria-busy={phase === "claiming"}>
-              <span>{phase === "claiming" ? claimProgressLabel(claimProgress, details.expired) : connected ? details.expired ? "Recover to sender wallet" : "Check price & claim" : pending ? "Connecting wallet…" : details.expired ? "Connect sender wallet to recover" : "Connect wallet to claim"}</span>
+              <span>{phase === "claiming" ? claimProgressLabel(claimProgress, details.expired) : connected ? details.expired ? "Recover to sender wallet" : details.pricePair ? "Check price & claim" : "Claim drop" : pending ? "Connecting wallet…" : details.expired ? "Connect sender wallet to recover" : "Connect wallet to claim"}</span>
               <Icon name={phase === "claiming" ? "lock" : "arrow"} />
             </button>
-            <p className="prototype-note"><Icon name="lock" size={14} /> {details.expired ? "Only the creating account can recover after this block." : `Pragma checks ${details.pricePair} inside the claim proof.`}</p>
+            <p className="prototype-note"><Icon name="lock" size={14} /> {details.expired ? "Only the creating account can recover after this block." : details.pricePair ? `Pragma checks ${details.pricePair} inside the claim proof.` : "No Oracle check; possession of this private link grants the claim."}</p>
           </section>
         ) : (
           <section className="claim-surface claim-unavailable clipped-surface">

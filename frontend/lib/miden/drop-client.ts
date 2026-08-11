@@ -13,16 +13,19 @@ let scriptPromise: Promise<NoteScript> | undefined;
 
 type WalletActions = Pick<WalletContextState, "address" | "requestTransaction" | "waitForTransaction">;
 
-export type CreateMidenDropInput = {
+type CreateMidenDropBaseInput = {
   wallet: WalletActions;
   amount: bigint;
   expirationDays: number;
   message?: string;
   faucetId: string;
   blocksPerDay: number;
-  pricePair: MidenPricePairId;
-  rawTargetPrice: bigint;
 };
+
+export type CreateMidenDropInput = CreateMidenDropBaseInput & (
+  | { pricePair?: undefined; rawTargetPrice?: undefined }
+  | { pricePair: MidenPricePairId; rawTargetPrice: bigint }
+);
 
 export async function createMidenDrop(input: CreateMidenDropInput): Promise<{
   envelope: DropEnvelopeV1;
@@ -39,18 +42,24 @@ export async function createMidenDrop(input: CreateMidenDropInput): Promise<{
   await client.syncChain();
   const currentBlock = await client.getSyncHeight();
   const expirationBlock = expirationBlockFromDays(currentBlock, input.expirationDays, input.blocksPerDay);
-  const pricePair = findMidenPricePair(input.pricePair);
-  if (!pricePair) throw new Error("Choose a supported BTC/USD or ETH/USD price condition.");
-  if (input.rawTargetPrice <= BigInt(0)) throw new Error("Enter a target price above zero.");
+  if ((input.pricePair === undefined) !== (input.rawTargetPrice === undefined)) {
+    throw new Error("Choose both a price pair and target, or disable the Oracle condition.");
+  }
+  const pricePair = input.pricePair ? findMidenPricePair(input.pricePair) : undefined;
+  if (input.pricePair && !pricePair) throw new Error("Choose a supported BTC/USD or ETH/USD price condition.");
+  if (input.rawTargetPrice !== undefined && input.rawTargetPrice <= BigInt(0)) {
+    throw new Error("Enter a target price above zero.");
+  }
+  const rawTargetPrice = input.rawTargetPrice ?? BigInt(0);
   const sender = accountIdFromAddress(wallet.address, sdk);
   const faucet = accountIdFromAddress(input.faucetId, sdk);
   const assets = new sdk.NoteAssets([new sdk.FungibleAsset(faucet, input.amount)]);
   const noteScript = await getDropNoteScript(client);
   const storage = new sdk.NoteStorage(new sdk.FeltArray([
     new sdk.Felt(BigInt(expirationBlock)),
-    new sdk.Felt(BigInt(pricePair.pairPrefix)),
-    new sdk.Felt(BigInt(pricePair.pairSuffix)),
-    new sdk.Felt(input.rawTargetPrice),
+    new sdk.Felt(BigInt(pricePair?.pairPrefix ?? 0)),
+    new sdk.Felt(BigInt(pricePair?.pairSuffix ?? 0)),
+    new sdk.Felt(rawTargetPrice),
   ]));
   const recipient = sdk.NoteRecipient.fromScript(noteScript, storage);
   const metadata = new sdk.NoteMetadata(sender, sdk.NoteType.Private, new sdk.NoteTag(DROP_NOTE_TAG));
@@ -82,8 +91,10 @@ export async function createMidenDrop(input: CreateMidenDropInput): Promise<{
       faucetId: input.faucetId,
       amount: input.amount.toString(),
       expirationBlock,
-      pricePair: pricePair.id,
-      rawTargetPrice: input.rawTargetPrice.toString(),
+      ...(pricePair ? {
+        pricePair: pricePair.id,
+        rawTargetPrice: rawTargetPrice.toString(),
+      } : {}),
       ...(input.message ? { message: input.message } : {}),
     },
   };

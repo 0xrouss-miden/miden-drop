@@ -124,8 +124,8 @@ function validateNoteStorage(
   note: InstanceType<typeof import("@miden-sdk/miden-sdk/lazy").Note>,
   envelope: DropEnvelopeV1,
 ) {
-  const pair = findMidenPricePair(envelope.pricePair);
-  if (!pair) throw new Error("This private drop uses an unsupported price pair.");
+  const pair = envelope.pricePair ? findMidenPricePair(envelope.pricePair) : undefined;
+  if (envelope.pricePair && !pair) throw new Error("This private drop uses an unsupported price pair.");
 
   const recipient = note.recipient();
   try {
@@ -136,9 +136,9 @@ function validateNoteStorage(
         const actual = items.map((item) => item.asInt());
         const expected = [
           BigInt(envelope.expirationBlock),
-          BigInt(pair.pairPrefix),
-          BigInt(pair.pairSuffix),
-          BigInt(envelope.rawTargetPrice),
+          BigInt(pair?.pairPrefix ?? 0),
+          BigInt(pair?.pairSuffix ?? 0),
+          BigInt(envelope.rawTargetPrice ?? 0),
         ];
         if (actual.length !== expected.length || actual.some((value, index) => value !== expected[index])) {
           throw new Error("The encrypted note conditions do not match this private drop.");

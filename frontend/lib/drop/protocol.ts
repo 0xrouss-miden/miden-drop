@@ -12,8 +12,8 @@ export type DropEnvelopeV1 = {
   faucetId: string;
   amount: string;
   expirationBlock: number;
-  pricePair: MidenPricePairId;
-  rawTargetPrice: string;
+  pricePair?: MidenPricePairId;
+  rawTargetPrice?: string;
   message?: string;
 };
 
@@ -67,6 +67,7 @@ export function parseDropFragment(fragment: string): DropLinkSecret {
 export function isDropEnvelope(value: unknown): value is DropEnvelopeV1 {
   if (!value || typeof value !== "object") return false;
   const envelope = value as Partial<DropEnvelopeV1>;
+  const hasPriceCondition = envelope.pricePair !== undefined || envelope.rawTargetPrice !== undefined;
   return envelope.version === DROP_PROTOCOL_VERSION
     && envelope.network === DROP_NETWORK
     && typeof envelope.noteFile === "string"
@@ -77,8 +78,10 @@ export function isDropEnvelope(value: unknown): value is DropEnvelopeV1 {
     && typeof envelope.expirationBlock === "number"
     && Number.isSafeInteger(envelope.expirationBlock)
     && envelope.expirationBlock > 0
-    && isMidenPricePairId(envelope.pricePair)
-    && typeof envelope.rawTargetPrice === "string"
-    && /^[1-9]\d*$/u.test(envelope.rawTargetPrice)
+    && (!hasPriceCondition || (
+      isMidenPricePairId(envelope.pricePair)
+      && typeof envelope.rawTargetPrice === "string"
+      && /^[1-9]\d*$/u.test(envelope.rawTargetPrice)
+    ))
     && (envelope.message === undefined || typeof envelope.message === "string");
 }

@@ -529,6 +529,11 @@ a { color: inherit; text-decoration: none; }
   font-size: 14px;
   font-weight: 700;
 }
+.target-price-input.is-disabled input {
+  color: var(--muted);
+  cursor: not-allowed;
+  opacity: .72;
+}
 .price-condition > .field-error {
   margin-top: -5px;
   margin-bottom: 8px;

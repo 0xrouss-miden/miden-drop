@@ -20,8 +20,8 @@ describe("drop link protocol", () => {
     expect(() => parseDropFragment("#v1.short.short")).toThrow();
   });
 
-  it("requires a supported price pair and positive raw target", () => {
-    const envelope = {
+  it("accepts an optional complete price condition", () => {
+    const plainEnvelope = {
       version: 1,
       network: "testnet",
       noteFile: "note",
@@ -29,11 +29,17 @@ describe("drop link protocol", () => {
       faucetId: "faucet-id",
       amount: "10",
       expirationBlock: 100,
+    };
+    const conditionedEnvelope = {
+      ...plainEnvelope,
       pricePair: "BTC/USD",
       rawTargetPrice: "6500000000000",
     };
-    expect(isDropEnvelope(envelope)).toBe(true);
-    expect(isDropEnvelope({ ...envelope, pricePair: "SOL/USD" })).toBe(false);
-    expect(isDropEnvelope({ ...envelope, rawTargetPrice: "0" })).toBe(false);
+    expect(isDropEnvelope(plainEnvelope)).toBe(true);
+    expect(isDropEnvelope(conditionedEnvelope)).toBe(true);
+    expect(isDropEnvelope({ ...conditionedEnvelope, pricePair: "SOL/USD" })).toBe(false);
+    expect(isDropEnvelope({ ...conditionedEnvelope, rawTargetPrice: "0" })).toBe(false);
+    expect(isDropEnvelope({ ...plainEnvelope, pricePair: "BTC/USD" })).toBe(false);
+    expect(isDropEnvelope({ ...plainEnvelope, rawTargetPrice: "6500000000000" })).toBe(false);
   });
 });

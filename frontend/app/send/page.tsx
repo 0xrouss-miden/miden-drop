@@ -23,7 +23,7 @@ const EXPIRATIONS = [
 ] as const;
 
 type SendPhase = "idle" | "creating" | "uploading" | "upload-failed" | "ready";
-type DropResult = { amount: string; symbol: string; expirationBlock: number; transactionId: string; pricePair: string; targetPrice: string };
+type DropResult = { amount: string; symbol: string; expirationBlock: number; transactionId: string; pricePair?: string; targetPrice?: string };
 type BalanceState =
   | { status: "idle" }
   | { status: "unavailable"; address: string }
@@ -34,7 +34,7 @@ export default function SendPage() {
   const [tokenId, setTokenId] = useState<string>(MIDEN_TOKENS[0].faucetId);
   const [amountTouched, setAmountTouched] = useState(false);
   const [expirationDays, setExpirationDays] = useState(7);
-  const [pricePairId, setPricePairId] = useState<string>(MIDEN_PRICE_PAIRS[0].id);
+  const [pricePairId, setPricePairId] = useState("");
   const [targetPrice, setTargetPrice] = useState("");
   const [targetTouched, setTargetTouched] = useState(false);
   const [message, setMessage] = useState("");
@@ -52,7 +52,7 @@ export default function SendPage() {
   const { address, connected, requestAssets, requestTransaction, waitForTransaction } = useWallet();
   const { connectWallet, error: connectionError, pending: connectionPending } = useWalletConnection();
   const selectedToken = MIDEN_TOKENS.find((token) => token.faucetId === tokenId) ?? MIDEN_TOKENS[0];
-  const selectedPricePair = findMidenPricePair(pricePairId) ?? MIDEN_PRICE_PAIRS[0];
+  const selectedPricePair = findMidenPricePair(pricePairId);
   const normalizedAmount = amount.replace(",", ".");
   const normalizedTargetPrice = targetPrice.replace(",", ".");
   const parsedAmount = useMemo(() => {
@@ -63,6 +63,7 @@ export default function SendPage() {
     }
   }, [normalizedAmount, selectedToken.decimals]);
   const parsedTargetPrice = useMemo(() => {
+    if (!selectedPricePair) return { units: null, error: "" };
     try {
       return { units: parseMidenTargetPrice(normalizedTargetPrice, selectedPricePair), error: "" };
     } catch (targetError) {
@@ -93,7 +94,7 @@ export default function SendPage() {
     : "";
   const amountError = parsedAmount.error || balanceError;
   const amountIsValid = parsedAmount.units !== null && !amountError;
-  const targetIsValid = parsedTargetPrice.units !== null && !parsedTargetPrice.error;
+  const targetIsValid = !selectedPricePair || (parsedTargetPrice.units !== null && !parsedTargetPrice.error);
 
   useEffect(() => {
     if (!connected || !address || !requestAssets) {
@@ -128,9 +129,9 @@ export default function SendPage() {
   async function createDrop(event: FormEvent) {
     event.preventDefault();
     setAmountTouched(true);
-    setTargetTouched(true);
+    if (selectedPricePair) setTargetTouched(true);
     setError(null);
-    if (!amountIsValid || parsedAmount.units === null || !targetIsValid || parsedTargetPrice.units === null) return;
+    if (!amountIsValid || parsedAmount.units === null || !targetIsValid) return;
     if (!connected || !address || !requestTransaction || !waitForTransaction) {
       await connectWallet();
       return;
@@ -140,16 +141,21 @@ export default function SendPage() {
     setCopied(false);
     pendingUploadRef.current = null;
     try {
-      const created = await createMidenDrop({
+      const commonDropInput = {
         wallet: { address, requestTransaction, waitForTransaction },
         amount: parsedAmount.units,
         expirationDays,
         message: message.trim() || undefined,
         faucetId: selectedToken.faucetId,
         blocksPerDay: MIDEN_BLOCKS_PER_DAY,
-        pricePair: selectedPricePair.id,
-        rawTargetPrice: parsedTargetPrice.units,
-      });
+      };
+      const created = selectedPricePair && parsedTargetPrice.units !== null
+        ? await createMidenDrop({
+            ...commonDropInput,
+            pricePair: selectedPricePair.id,
+            rawTargetPrice: parsedTargetPrice.units,
+          })
+        : await createMidenDrop(commonDropInput);
       const encrypted = await encryptDropEnvelope(created.envelope);
       pendingUploadRef.current = encrypted;
       setResult({
@@ -157,8 +163,10 @@ export default function SendPage() {
         symbol: selectedToken.symbol,
         expirationBlock: created.envelope.expirationBlock,
         transactionId: created.transactionId,
-        pricePair: selectedPricePair.id,
-        targetPrice: formatMidenTargetPrice(parsedTargetPrice.units, selectedPricePair),
+        ...(selectedPricePair && parsedTargetPrice.units !== null ? {
+          pricePair: selectedPricePair.id,
+          targetPrice: formatMidenTargetPrice(parsedTargetPrice.units, selectedPricePair),
+        } : {}),
       });
       setBalanceState((current) => {
         if (current.status !== "ready" || current.address !== address) return current;
@@ -252,18 +260,19 @@ export default function SendPage() {
                 <label>
                   <span>Asset price</span>
                   <select value={pricePairId} onChange={(event) => { setPricePairId(event.target.value); setTargetPrice(""); setTargetTouched(false); }} aria-label="Price pair">
+                    <option value="">No Oracle</option>
                     {MIDEN_PRICE_PAIRS.map((pair) => <option key={pair.id} value={pair.id}>{pair.id}</option>)}
                   </select>
                 </label>
                 <label>
-                  <span>Reaches</span>
-                  <span className="target-price-input">
-                    <span aria-hidden="true">$</span>
-                    <input inputMode="decimal" value={targetPrice} placeholder={selectedPricePair.placeholder} onBlur={() => setTargetTouched(true)} onChange={(event) => { setTargetPrice(event.target.value); setTargetTouched(true); }} aria-label={`${selectedPricePair.baseSymbol} target price in US dollars`} aria-invalid={targetTouched && !targetIsValid} aria-describedby="target-price-error" />
+                  <span>{selectedPricePair ? "Reaches" : "Target price"}</span>
+                  <span className={`target-price-input${selectedPricePair ? "" : " is-disabled"}`}>
+                    {selectedPricePair && <span aria-hidden="true">$</span>}
+                    <input inputMode="decimal" value={targetPrice} disabled={!selectedPricePair} placeholder={selectedPricePair?.placeholder ?? "Not required"} onBlur={() => setTargetTouched(true)} onChange={(event) => { setTargetPrice(event.target.value); setTargetTouched(true); }} aria-label={selectedPricePair ? `${selectedPricePair.baseSymbol} target price in US dollars` : "No target price required"} aria-invalid={selectedPricePair ? targetTouched && !targetIsValid : undefined} aria-describedby="target-price-error" />
                   </span>
                 </label>
               </div>
-              <p className="field-error" id="target-price-error" aria-live="polite">{targetTouched && !targetIsValid ? parsedTargetPrice.error : ""}</p>
+              <p className="field-error" id="target-price-error" aria-live="polite">{selectedPricePair && targetTouched && !targetIsValid ? parsedTargetPrice.error : ""}</p>
             </fieldset>
             <div className="composer-options">
               <label><span>Sender recovers after</span><select value={expirationDays} onChange={(event) => setExpirationDays(Number(event.target.value))} aria-label="Sender recovery delay">{EXPIRATIONS.map((option) => <option key={option.days} value={option.days}>{option.label}</option>)}</select></label>
@@ -273,7 +282,7 @@ export default function SendPage() {
               <span>{phase === "creating" ? "Confirming private note…" : phase === "uploading" ? "Securing private link…" : connected ? "Create private link" : connectionPending ? "Connecting wallet…" : "Connect wallet to create"}</span>
               <Icon name={busy ? "lock" : "arrow"} />
             </button>
-            <p className="prototype-note"><Icon name="lock" size={14} /> Before recovery, another bearer can claim when {selectedPricePair.id} reaches your target.</p>
+            <p className="prototype-note"><Icon name="lock" size={14} /> {selectedPricePair ? `Before recovery, another bearer can claim when ${selectedPricePair.id} reaches your target.` : "Before recovery, another bearer with the link can claim."}</p>
           </form>
         </div>
       </section>
@@ -289,7 +298,7 @@ export default function SendPage() {
         <div className="result-copy">
           <p className="result-status"><span><Icon name="check" size={16} /></span>Your private drop is ready</p>
           <h2>{result?.amount ?? amount} {result?.symbol ?? selectedToken.symbol}, ready to share<span>.</span></h2>
-          {result && <p className="result-condition"><span>Unlocks when</span><strong>{result.pricePair} ≥ {result.targetPrice}</strong></p>}
+          {result && <p className="result-condition"><span>Claim condition</span><strong>{result.pricePair ? `${result.pricePair} ≥ ${result.targetPrice}` : "Bearer link · no Oracle"}</strong></p>}
           <p>The note is encrypted before it reaches Miden Drop. Send this bearer link only through a channel you trust.</p>
           <div className="link-output"><code>{linkRef.current}</code><button type="button" onClick={copyLink}><Icon name={copied ? "check" : "copy"} size={18} />{copied ? "Copied" : "Copy link"}</button></div>
           {linkRef.current && <Link className="text-action" href={linkRef.current}>Open claim page <Icon name="arrow" size={18} /></Link>}

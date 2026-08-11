@@ -30,9 +30,9 @@ export function useWalletConnection() {
     if (!connectRequested || !wallet) return;
 
     void connect(
-      PrivateDataPermission.UponRequest,
+      PrivateDataPermission.Auto,
       WalletAdapterNetwork.Testnet,
-      AllowedPrivateData.None,
+      AllowedPrivateData.Assets,
     )
       .catch((connectionError: unknown) => {
         setError(connectionError instanceof Error ? connectionError.message : "Could not connect to the wallet.");
@@ -54,9 +54,9 @@ export function useWalletConnection() {
       }
 
       await connect(
-        PrivateDataPermission.UponRequest,
+        PrivateDataPermission.Auto,
         WalletAdapterNetwork.Testnet,
-        AllowedPrivateData.None,
+        AllowedPrivateData.Assets,
       );
     } catch (connectionError) {
       setError(connectionError instanceof Error ? connectionError.message : "Could not connect to the wallet.");
