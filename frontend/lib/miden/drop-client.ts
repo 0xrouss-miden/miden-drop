@@ -5,6 +5,7 @@ import type { NoteScript } from "@miden-sdk/miden-sdk";
 import { expirationBlockFromDays } from "@/lib/drop/amount";
 import { bytesToBase64Url, type DropEnvelopeV1 } from "@/lib/drop/protocol";
 import { DROP_NOTE_SOURCE } from "./drop-note-source";
+import { findMidenPricePair, type MidenPricePairId } from "./price-pairs";
 
 const DROP_NOTE_TAG = 0x4d44524f;
 let clientPromise: Promise<Awaited<ReturnType<typeof createClient>>> | undefined;
@@ -19,6 +20,8 @@ export type CreateMidenDropInput = {
   message?: string;
   faucetId: string;
   blocksPerDay: number;
+  pricePair: MidenPricePairId;
+  rawTargetPrice: bigint;
 };
 
 export async function createMidenDrop(input: CreateMidenDropInput): Promise<{
@@ -36,11 +39,19 @@ export async function createMidenDrop(input: CreateMidenDropInput): Promise<{
   await client.syncChain();
   const currentBlock = await client.getSyncHeight();
   const expirationBlock = expirationBlockFromDays(currentBlock, input.expirationDays, input.blocksPerDay);
+  const pricePair = findMidenPricePair(input.pricePair);
+  if (!pricePair) throw new Error("Choose a supported BTC/USD or ETH/USD price condition.");
+  if (input.rawTargetPrice <= BigInt(0)) throw new Error("Enter a target price above zero.");
   const sender = accountIdFromAddress(wallet.address, sdk);
   const faucet = accountIdFromAddress(input.faucetId, sdk);
   const assets = new sdk.NoteAssets([new sdk.FungibleAsset(faucet, input.amount)]);
   const noteScript = await getDropNoteScript(client);
-  const storage = new sdk.NoteStorage(new sdk.FeltArray([new sdk.Felt(BigInt(expirationBlock))]));
+  const storage = new sdk.NoteStorage(new sdk.FeltArray([
+    new sdk.Felt(BigInt(expirationBlock)),
+    new sdk.Felt(BigInt(pricePair.pairPrefix)),
+    new sdk.Felt(BigInt(pricePair.pairSuffix)),
+    new sdk.Felt(input.rawTargetPrice),
+  ]));
   const recipient = sdk.NoteRecipient.fromScript(noteScript, storage);
   const metadata = new sdk.NoteMetadata(sender, sdk.NoteType.Private, new sdk.NoteTag(DROP_NOTE_TAG));
   const note = new sdk.Note(assets, metadata, recipient);
@@ -71,6 +82,8 @@ export async function createMidenDrop(input: CreateMidenDropInput): Promise<{
       faucetId: input.faucetId,
       amount: input.amount.toString(),
       expirationBlock,
+      pricePair: pricePair.id,
+      rawTargetPrice: input.rawTargetPrice.toString(),
       ...(input.message ? { message: input.message } : {}),
     },
   };

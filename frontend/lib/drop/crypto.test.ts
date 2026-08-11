@@ -11,6 +11,8 @@ const envelope: DropEnvelopeV1 = {
   faucetId: "mtst1faucet",
   amount: "125000000",
   expirationBlock: 42_000,
+  pricePair: "BTC/USD",
+  rawTargetPrice: "6500000000000",
   message: "For coffee ☕",
 };
 

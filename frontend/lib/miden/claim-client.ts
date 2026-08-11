@@ -2,6 +2,7 @@ import { Transaction as WalletTransaction } from "@miden-sdk/miden-wallet-adapte
 import type { WalletContextState } from "@miden-sdk/miden-wallet-adapter-react/dist/useWallet.js";
 
 import { base64UrlToBytes, type DropEnvelopeV1 } from "@/lib/drop/protocol";
+import { findMidenPricePair } from "./price-pairs";
 import { canonicalMidenNoteId, midenNoteIdsEqual } from "./note-id";
 
 type ClaimWallet = Pick<
@@ -76,6 +77,7 @@ async function prepareNoteFile(noteBytes: Uint8Array, envelope: DropEnvelopeV1) 
           throw new Error("The encrypted note does not match this private drop.");
         }
         validateNoteAssets(note.assets(), envelope, sdk);
+        validateNoteStorage(note, envelope);
         const importBytes = await authenticatedNoteFileBytes(note, embeddedNoteId, sdk);
         return { noteId: embeddedNoteId, importBytes };
       } finally {
@@ -98,6 +100,7 @@ async function prepareNoteFile(noteBytes: Uint8Array, envelope: DropEnvelopeV1) 
             throw new Error("The encrypted note does not match this private drop.");
           }
           validateNoteAssets(completeNote.assets(), envelope, sdk);
+          validateNoteStorage(completeNote, envelope);
           return { noteId: embeddedNoteId, importBytes: noteBytes };
         } finally {
           noteId.free();
@@ -114,6 +117,40 @@ async function prepareNoteFile(noteBytes: Uint8Array, envelope: DropEnvelopeV1) 
     );
   } finally {
     noteFile.free();
+  }
+}
+
+function validateNoteStorage(
+  note: InstanceType<typeof import("@miden-sdk/miden-sdk/lazy").Note>,
+  envelope: DropEnvelopeV1,
+) {
+  const pair = findMidenPricePair(envelope.pricePair);
+  if (!pair) throw new Error("This private drop uses an unsupported price pair.");
+
+  const recipient = note.recipient();
+  try {
+    const storage = recipient.storage();
+    try {
+      const items = storage.items();
+      try {
+        const actual = items.map((item) => item.asInt());
+        const expected = [
+          BigInt(envelope.expirationBlock),
+          BigInt(pair.pairPrefix),
+          BigInt(pair.pairSuffix),
+          BigInt(envelope.rawTargetPrice),
+        ];
+        if (actual.length !== expected.length || actual.some((value, index) => value !== expected[index])) {
+          throw new Error("The encrypted note conditions do not match this private drop.");
+        }
+      } finally {
+        for (const item of items) item.free();
+      }
+    } finally {
+      storage.free();
+    }
+  } finally {
+    recipient.free();
   }
 }
 

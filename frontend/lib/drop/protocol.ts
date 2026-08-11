@@ -1,3 +1,5 @@
+import { isMidenPricePairId, type MidenPricePairId } from "@/lib/miden/price-pairs";
+
 export const DROP_PROTOCOL_VERSION = 1 as const;
 export const DROP_NETWORK = "testnet" as const;
 export const DROP_AAD = "miden-drop:v1:testnet";
@@ -10,6 +12,8 @@ export type DropEnvelopeV1 = {
   faucetId: string;
   amount: string;
   expirationBlock: number;
+  pricePair: MidenPricePairId;
+  rawTargetPrice: string;
   message?: string;
 };
 
@@ -70,6 +74,11 @@ export function isDropEnvelope(value: unknown): value is DropEnvelopeV1 {
     && typeof envelope.faucetId === "string"
     && typeof envelope.amount === "string"
     && /^\d+$/u.test(envelope.amount)
+    && typeof envelope.expirationBlock === "number"
     && Number.isSafeInteger(envelope.expirationBlock)
+    && envelope.expirationBlock > 0
+    && isMidenPricePairId(envelope.pricePair)
+    && typeof envelope.rawTargetPrice === "string"
+    && /^[1-9]\d*$/u.test(envelope.rawTargetPrice)
     && (envelope.message === undefined || typeof envelope.message === "string");
 }

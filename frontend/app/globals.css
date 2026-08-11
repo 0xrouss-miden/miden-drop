@@ -467,7 +467,71 @@ a { color: inherit; text-decoration: none; }
 }
 .composer {
   width: min(100%, 520px);
-  padding: 26px 28px 22px;
+  padding: 28px 28px 22px;
+}
+.composer .amount-row {
+  padding: 2px 0 18px;
+}
+.composer .amount-meta-row {
+  margin-bottom: 12px;
+}
+.price-condition {
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  border-bottom: 1px solid var(--line);
+}
+.price-condition legend {
+  width: 100%;
+  padding: 16px 0 4px;
+  color: var(--muted);
+  font-size: 11px;
+}
+.condition-fields {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+}
+.condition-fields label {
+  min-width: 0;
+  min-height: 64px;
+  padding: 12px 20px 12px 0;
+  display: grid;
+  align-content: center;
+  gap: 5px;
+}
+.condition-fields label + label {
+  border-left: 1px solid var(--line);
+  padding-left: 20px;
+  padding-right: 0;
+}
+.condition-fields label > span:first-child {
+  color: var(--muted);
+  font-size: 11px;
+}
+.condition-fields select,
+.target-price-input input {
+  width: 100%;
+  min-width: 0;
+  border: 0;
+  background: transparent;
+  outline: 0;
+  color: var(--ink);
+  font-size: 14px;
+  font-weight: 700;
+}
+.target-price-input {
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  color: var(--ink);
+  font-size: 14px;
+  font-weight: 700;
+}
+.price-condition > .field-error {
+  margin-top: -5px;
+  margin-bottom: 8px;
 }
 .composer-options {
   display: grid;
@@ -475,13 +539,17 @@ a { color: inherit; text-decoration: none; }
   border-bottom: 1px solid var(--line);
 }
 .composer-options label {
+  min-width: 0;
+  min-height: 64px;
   display: grid;
+  align-content: center;
   gap: 5px;
-  padding: 16px 0;
+  padding: 12px 20px 12px 0;
 }
 .composer-options label + label {
   border-left: 1px solid var(--line);
   padding-left: 20px;
+  padding-right: 0;
 }
 .composer-options span {
   color: var(--muted);
@@ -499,7 +567,7 @@ a { color: inherit; text-decoration: none; }
   font-weight: 700;
 }
 .composer-submit {
-  margin-top: 18px;
+  margin-top: 20px;
 }
 .composer-submit[aria-busy="true"] svg {
   animation: creating-pulse 900ms ease-in-out infinite alternate;
@@ -508,6 +576,19 @@ a { color: inherit; text-decoration: none; }
   overflow-wrap: anywhere;
   font-family: var(--font-plex-mono), monospace;
   font-size: 11px;
+}
+.result-copy > p.result-condition {
+  margin: 16px 0;
+  padding: 12px 0;
+  border-top: 1px solid var(--line);
+  border-bottom: 1px solid var(--line);
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 14px;
+  color: var(--ink);
+  font-size: 12px;
+  font-weight: 700;
 }
 @keyframes creating-pulse {
   to { opacity: .35; }
@@ -642,6 +723,12 @@ a { color: inherit; text-decoration: none; }
 .claim-surface .detail-list > div {
   padding: 15px 0;
 }
+.claim-surface .detail-list dd {
+  max-width: 62%;
+  justify-content: flex-end;
+  text-align: right;
+  overflow-wrap: anywhere;
+}
 .claim-loading,
 .claim-unavailable {
   min-height: 230px;
@@ -680,6 +767,10 @@ a { color: inherit; text-decoration: none; }
   }
   .composer {
     width: 100%;
+    padding: 22px 18px 20px;
+  }
+  .composer .amount-row {
+    padding-bottom: 16px;
   }
   .amount-input-row input {
     font-size: 44px;
@@ -694,6 +785,19 @@ a { color: inherit; text-decoration: none; }
   }
   .composer-options {
     grid-template-columns: 1fr;
+  }
+  .condition-fields {
+    grid-template-columns: 1fr;
+  }
+  .condition-fields label + label {
+    border-top: 1px solid var(--line);
+    border-left: 0;
+    padding-left: 0;
+  }
+  .condition-fields label,
+  .composer-options label {
+    min-height: 60px;
+    padding-right: 0;
   }
   .composer-options label + label {
     border-left: 0;

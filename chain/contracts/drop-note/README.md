@@ -1,18 +1,31 @@
-# Miden Drop note
+# Miden Drop price note
 
-`src/drop_note.masm` defines the private bearer note used by Miden Drop.
+`src/drop_note.masm` defines the private, price-gated bearer note used by Miden Drop.
 
-The note has no target account in storage. Before expiration, anyone who possesses the complete
-private note data can consume it, and the script transfers every asset in the note to the consuming
-account through Miden's standard Basic Wallet interface.
+The note uses one script for both supported Pragma pairs. Its four storage items parameterize each
+individual drop:
 
-The note stores one value, `expiration_block`:
+| Index | Value              | Meaning                                           |
+|------:|--------------------|---------------------------------------------------|
+| 0     | `recovery_block`   | Sender-only recovery begins at this block         |
+| 1     | `pair_prefix`      | `1` for BTC/USD; `2` for ETH/USD                  |
+| 2     | `pair_suffix`      | `0` for both supported pairs                      |
+| 3     | `raw_target_price` | USD target multiplied by `100_000_000`            |
 
-- `0` disables expiration.
-- A non-zero block height makes the note claimable only by its original sender from that block
-  onward. Recovery is not automatic; the sender must consume the expired note in a transaction.
+Before `recovery_block`, the original sender account is explicitly rejected. Any other account with
+the complete private note data may claim only if Pragma returns a fresh, tracked median and
+`median_price >= raw_target_price`.
 
-The private note data is therefore bearer authorization and must only be shared with the intended
-recipient. Block height, rather than wall-clock time, is the consensus value enforced by the note
-script. The frontend integration that creates and transports this data is intentionally out of scope
-for this phase.
+At and after `recovery_block`, the Oracle call is skipped and only the original sender can consume
+the note. Recovery is not automatic; the sender must submit the consuming transaction.
+
+The script pins the testnet Pragma Oracle account and `get_median` MAST root. A Pragma redeployment
+or procedure upgrade requires updating those constants and therefore creates a new note-script root.
+
+Both BTC/USD and ETH/USD currently use eight decimal places. For example:
+
+- BTC/USD at `$65,000` is stored as `6_500_000_000_000`.
+- ETH/USD at `$2,000` is stored as `200_000_000_000`.
+
+The private note remains bearer authorization. Rejecting the sender's account does not prevent the
+same person from using another account, which is an accepted limitation of this concept app.

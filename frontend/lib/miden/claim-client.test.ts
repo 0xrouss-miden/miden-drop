@@ -4,6 +4,8 @@ import { bytesToBase64Url, type DropEnvelopeV1 } from "@/lib/drop/protocol";
 
 const NOTE_ID = `0x${"ab".repeat(32)}`;
 const FAUCET_ID = "mtst1test-faucet";
+const RECOVERY_BLOCK = 100;
+const RAW_TARGET = BigInt("6500000000000");
 
 function freeableId(value: string) {
   return { toString: () => value, free: vi.fn() };
@@ -27,6 +29,21 @@ vi.mock("@miden-sdk/miden-sdk/lazy", () => {
           faucetId: () => freeableId(FAUCET_ID),
           free: vi.fn(),
         }],
+        free: vi.fn(),
+      };
+    }
+
+    recipient() {
+      return {
+        storage: () => ({
+          items: () => [
+            BigInt(RECOVERY_BLOCK),
+            BigInt(1),
+            BigInt(0),
+            RAW_TARGET,
+          ].map((value) => ({ asInt: () => value, free: vi.fn() })),
+          free: vi.fn(),
+        }),
         free: vi.fn(),
       };
     }
@@ -94,7 +111,9 @@ function envelope(bytes: Uint8Array): DropEnvelopeV1 {
     noteId: NOTE_ID,
     faucetId: FAUCET_ID,
     amount: "10",
-    expirationBlock: 100,
+    expirationBlock: RECOVERY_BLOCK,
+    pricePair: "BTC/USD",
+    rawTargetPrice: RAW_TARGET.toString(),
   };
 }
 
@@ -134,6 +153,21 @@ describe("claimMidenDrop note payloads", () => {
       { importPrivateNote, requestTransaction, waitForTransaction },
       envelope(new Uint8Array([2, 7, 9])),
     )).rejects.toThrow("legacy private drop does not contain the complete note");
+
+    expect(importPrivateNote).not.toHaveBeenCalled();
+    expect(requestTransaction).not.toHaveBeenCalled();
+  });
+
+  it("rejects envelope conditions that do not match the note storage", async () => {
+    const importPrivateNote = vi.fn();
+    const requestTransaction = vi.fn();
+    const waitForTransaction = vi.fn();
+    const mismatched = { ...envelope(new Uint8Array([1, 7, 9])), pricePair: "ETH/USD" as const };
+
+    await expect(claimMidenDrop(
+      { importPrivateNote, requestTransaction, waitForTransaction },
+      mismatched,
+    )).rejects.toThrow("note conditions do not match");
 
     expect(importPrivateNote).not.toHaveBeenCalled();
     expect(requestTransaction).not.toHaveBeenCalled();

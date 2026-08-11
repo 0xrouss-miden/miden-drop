@@ -11,21 +11,26 @@ import { parseDropFragment, type DropEnvelopeV1 } from "@/lib/drop/protocol";
 import { claimMidenDrop, type ClaimProgress } from "@/lib/miden/claim-client";
 import { findMidenToken } from "@/lib/miden/config";
 import { getCurrentMidenBlock } from "@/lib/miden/drop-client";
+import { findMidenPricePair, formatMidenTargetPrice } from "@/lib/miden/price-pairs";
 import { Icon } from "../ui";
 import { useWalletConnection } from "../wallet-connection";
 
 type ClaimPhase = "loading" | "ready" | "claiming" | "claimed" | "invalid" | "missing" | "failed";
-type ClaimDetails = { amount: string; symbol: string; expirationBlock: number; message?: string; expired: boolean };
+type ClaimDetails = { amount: string; symbol: string; expirationBlock: number; message?: string; expired: boolean; pricePair: string; targetPrice: string };
 
 export default function ClaimPage() {
   const [phase, setPhase] = useState<ClaimPhase>("loading");
   const [error, setError] = useState<string | null>(null);
   const [details, setDetails] = useState<ClaimDetails | null>(null);
   const [claimProgress, setClaimProgress] = useState<ClaimProgress>("validating");
+  const [completedAsRecovery, setCompletedAsRecovery] = useState(false);
   const envelopeRef = useRef<DropEnvelopeV1 | null>(null);
   const currentBlockRef = useRef(0);
   const { importPrivateNote, requestTransaction, waitForTransaction } = useWallet();
   const { connectWallet, connected, error: connectionError, pending } = useWalletConnection();
+  const pageTitle = phase === "claimed"
+    ? completedAsRecovery ? "Drop recovered" : "Drop claimed"
+    : details?.expired ? "Recover this drop" : "Claim this drop";
   useEffect(() => {
     let cancelled = false;
 
@@ -37,6 +42,9 @@ export default function ClaimPage() {
         const decrypted = await decryptDropEnvelope(secret.key, encrypted.nonce, encrypted.ciphertext);
         const token = findMidenToken(decrypted.faucetId);
         if (!token) throw new Error("This drop uses an unsupported token.");
+        const pricePair = findMidenPricePair(decrypted.pricePair);
+        if (!pricePair) throw new Error("This drop uses an unsupported price pair.");
+        const rawTargetPrice = BigInt(decrypted.rawTargetPrice);
         const currentBlock = await getCurrentMidenBlock().catch(() => 0);
         if (cancelled) return;
         envelopeRef.current = decrypted;
@@ -47,6 +55,8 @@ export default function ClaimPage() {
           expirationBlock: decrypted.expirationBlock,
           message: decrypted.message,
           expired: currentBlock >= decrypted.expirationBlock,
+          pricePair: pricePair.id,
+          targetPrice: formatMidenTargetPrice(rawTargetPrice, pricePair),
         });
         setPhase("ready");
       } catch (loadError) {
@@ -82,11 +92,6 @@ export default function ClaimPage() {
       setError("Open the original private link again before claiming.");
       return;
     }
-    if (currentBlockRef.current >= currentEnvelope.expirationBlock) {
-      setError("This drop has expired and can now only be recovered by its sender.");
-      return;
-    }
-
     try {
       setPhase("claiming");
       setClaimProgress("validating");
@@ -96,14 +101,17 @@ export default function ClaimPage() {
         setClaimProgress,
       );
       envelopeRef.current = null;
+      setCompletedAsRecovery(currentBlockRef.current >= currentEnvelope.expirationBlock);
       setPhase("claimed");
     } catch (claimError) {
       setPhase("ready");
       const message = claimError instanceof Error ? claimError.message : "";
       if (/consum|nullifier|already/iu.test(message)) {
         setError("This drop has already been claimed.");
-      } else if (/expired|sender/iu.test(message)) {
-        setError("This drop has expired and can now only be recovered by its sender.");
+      } else if (/price|pragma|tracked|fresh|target/iu.test(message)) {
+        setError("The current Oracle price has not reached this target yet. Try again after the market moves.");
+      } else if (/expired|sender|recovery/iu.test(message)) {
+        setError("The recovery window is open, but only the sender account can recover this drop.");
       } else if (/not[_ ]?granted|reject|denied|cancel/iu.test(message)) {
         setError("The wallet request was not approved. Retry and approve both the note import and the claim.");
       } else {
@@ -115,7 +123,7 @@ export default function ClaimPage() {
   return (
     <main className="claim-page">
       <section className="claim-task">
-        <h1>{phase === "claimed" ? "Drop claimed" : "Claim this drop"}<span>.</span></h1>
+        <h1>{pageTitle}<span>.</span></h1>
         {(error || connectionError) && <div className="error-banner" role="alert">{error || connectionError}</div>}
 
         {phase === "loading" ? (
@@ -126,7 +134,7 @@ export default function ClaimPage() {
           </section>
         ) : phase === "claimed" ? (
           <section className="claim-surface clipped-surface">
-            <div className="success-state" role="status"><span><Icon name="check" /></span><div><strong>Funds received</strong><p>The private note was consumed by your wallet on Miden Testnet.</p></div></div>
+            <div className="success-state" role="status"><span><Icon name="check" /></span><div><strong>{completedAsRecovery ? "Funds recovered" : "Funds received"}</strong><p>The private note was consumed by your wallet on Miden Testnet.</p></div></div>
             <Link className="primary-button claim-complete-action" href="/">Return home <Icon name="arrow" /></Link>
           </section>
         ) : details ? (
@@ -137,15 +145,16 @@ export default function ClaimPage() {
             </div>
             <dl className="detail-list">
               <div><dt>From</dt><dd>Private sender</dd></div>
+              <div><dt>Claim condition</dt><dd>{details.pricePair} ≥ {details.targetPrice}</dd></div>
               <div><dt>Network</dt><dd><span className="status-dot" />Miden Testnet</dd></div>
-              <div><dt>Expires</dt><dd>{details.expired ? "Expired" : `Block ${details.expirationBlock.toLocaleString()}`}</dd></div>
+              <div><dt>Sender recovery</dt><dd>{details.expired ? "Open now" : `Block ${details.expirationBlock.toLocaleString()}`}</dd></div>
               <div><dt>Message</dt><dd>{details.message || "No message"}</dd></div>
             </dl>
-            <button className="primary-button claim-button" type="button" onClick={claimDrop} disabled={phase === "claiming" || pending || details.expired} aria-busy={phase === "claiming"}>
-              <span>{details.expired ? "Drop expired" : phase === "claiming" ? claimProgressLabel(claimProgress) : connected ? "Claim to wallet" : pending ? "Connecting wallet…" : "Connect wallet to claim"}</span>
+            <button className="primary-button claim-button" type="button" onClick={claimDrop} disabled={phase === "claiming" || pending} aria-busy={phase === "claiming"}>
+              <span>{phase === "claiming" ? claimProgressLabel(claimProgress, details.expired) : connected ? details.expired ? "Recover to sender wallet" : "Check price & claim" : pending ? "Connecting wallet…" : details.expired ? "Connect sender wallet to recover" : "Connect wallet to claim"}</span>
               <Icon name={phase === "claiming" ? "lock" : "arrow"} />
             </button>
-            <p className="prototype-note"><Icon name="lock" size={14} /> Your wallet will ask you to approve the note import and then the claim.</p>
+            <p className="prototype-note"><Icon name="lock" size={14} /> {details.expired ? "Only the creating account can recover after this block." : `Pragma checks ${details.pricePair} inside the claim proof.`}</p>
           </section>
         ) : (
           <section className="claim-surface claim-unavailable clipped-surface">
@@ -160,9 +169,9 @@ export default function ClaimPage() {
   );
 }
 
-function claimProgressLabel(progress: ClaimProgress) {
+function claimProgressLabel(progress: ClaimProgress, recovering: boolean) {
   if (progress === "importing") return "Approve note import in wallet…";
-  if (progress === "requesting") return "Approve claim in wallet…";
+  if (progress === "requesting") return recovering ? "Approve recovery in wallet…" : "Approve claim in wallet…";
   if (progress === "confirming") return "Waiting for Testnet confirmation…";
   return "Validating private note…";
 }

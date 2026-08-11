@@ -12,6 +12,7 @@ import { encryptDropEnvelope } from "@/lib/drop/crypto";
 import { buildDropFragment, type EncryptedDrop } from "@/lib/drop/protocol";
 import { MIDEN_BLOCKS_PER_DAY, MIDEN_TOKENS } from "@/lib/miden/config";
 import { createMidenDrop } from "@/lib/miden/drop-client";
+import { MIDEN_PRICE_PAIRS, findMidenPricePair, formatMidenTargetPrice, parseMidenTargetPrice } from "@/lib/miden/price-pairs";
 import { useWalletConnection } from "../wallet-connection";
 import { Icon, QrPreview } from "../ui";
 
@@ -22,7 +23,7 @@ const EXPIRATIONS = [
 ] as const;
 
 type SendPhase = "idle" | "creating" | "uploading" | "upload-failed" | "ready";
-type DropResult = { amount: string; symbol: string; expirationBlock: number; transactionId: string };
+type DropResult = { amount: string; symbol: string; expirationBlock: number; transactionId: string; pricePair: string; targetPrice: string };
 type BalanceState =
   | { status: "idle" }
   | { status: "unavailable"; address: string }
@@ -33,6 +34,9 @@ export default function SendPage() {
   const [tokenId, setTokenId] = useState<string>(MIDEN_TOKENS[0].faucetId);
   const [amountTouched, setAmountTouched] = useState(false);
   const [expirationDays, setExpirationDays] = useState(7);
+  const [pricePairId, setPricePairId] = useState<string>(MIDEN_PRICE_PAIRS[0].id);
+  const [targetPrice, setTargetPrice] = useState("");
+  const [targetTouched, setTargetTouched] = useState(false);
   const [message, setMessage] = useState("");
   const [phase, setPhase] = useState<SendPhase>("idle");
   const [result, setResult] = useState<DropResult | null>(null);
@@ -48,7 +52,9 @@ export default function SendPage() {
   const { address, connected, requestAssets, requestTransaction, waitForTransaction } = useWallet();
   const { connectWallet, error: connectionError, pending: connectionPending } = useWalletConnection();
   const selectedToken = MIDEN_TOKENS.find((token) => token.faucetId === tokenId) ?? MIDEN_TOKENS[0];
+  const selectedPricePair = findMidenPricePair(pricePairId) ?? MIDEN_PRICE_PAIRS[0];
   const normalizedAmount = amount.replace(",", ".");
+  const normalizedTargetPrice = targetPrice.replace(",", ".");
   const parsedAmount = useMemo(() => {
     try {
       return { units: parseDecimalUnits(normalizedAmount, selectedToken.decimals), error: "" };
@@ -56,6 +62,14 @@ export default function SendPage() {
       return { units: null, error: amountError instanceof Error ? amountError.message : "Enter a valid amount." };
     }
   }, [normalizedAmount, selectedToken.decimals]);
+  const parsedTargetPrice = useMemo(() => {
+    try {
+      return { units: parseMidenTargetPrice(normalizedTargetPrice, selectedPricePair), error: "" };
+    } catch (targetError) {
+      const message = targetError instanceof Error ? targetError.message : "Enter a valid target price.";
+      return { units: null, error: message.replace("amount", "target price") };
+    }
+  }, [normalizedTargetPrice, selectedPricePair]);
   const busy = phase === "creating" || phase === "uploading";
   const availableBalance = useMemo(() => {
     if (!connected) return { label: "Connect wallet to view", fullLabel: "Connect wallet to view", units: null };
@@ -79,6 +93,7 @@ export default function SendPage() {
     : "";
   const amountError = parsedAmount.error || balanceError;
   const amountIsValid = parsedAmount.units !== null && !amountError;
+  const targetIsValid = parsedTargetPrice.units !== null && !parsedTargetPrice.error;
 
   useEffect(() => {
     if (!connected || !address || !requestAssets) {
@@ -113,8 +128,9 @@ export default function SendPage() {
   async function createDrop(event: FormEvent) {
     event.preventDefault();
     setAmountTouched(true);
+    setTargetTouched(true);
     setError(null);
-    if (!amountIsValid || parsedAmount.units === null) return;
+    if (!amountIsValid || parsedAmount.units === null || !targetIsValid || parsedTargetPrice.units === null) return;
     if (!connected || !address || !requestTransaction || !waitForTransaction) {
       await connectWallet();
       return;
@@ -131,10 +147,19 @@ export default function SendPage() {
         message: message.trim() || undefined,
         faucetId: selectedToken.faucetId,
         blocksPerDay: MIDEN_BLOCKS_PER_DAY,
+        pricePair: selectedPricePair.id,
+        rawTargetPrice: parsedTargetPrice.units,
       });
       const encrypted = await encryptDropEnvelope(created.envelope);
       pendingUploadRef.current = encrypted;
-      setResult({ amount: normalizedAmount, symbol: selectedToken.symbol, expirationBlock: created.envelope.expirationBlock, transactionId: created.transactionId });
+      setResult({
+        amount: normalizedAmount,
+        symbol: selectedToken.symbol,
+        expirationBlock: created.envelope.expirationBlock,
+        transactionId: created.transactionId,
+        pricePair: selectedPricePair.id,
+        targetPrice: formatMidenTargetPrice(parsedTargetPrice.units, selectedPricePair),
+      });
       setBalanceState((current) => {
         if (current.status !== "ready" || current.address !== address) return current;
         return {
@@ -221,15 +246,34 @@ export default function SendPage() {
               </div>
               <p className="field-error" id="amount-error" aria-live="polite">{amountTouched && !amountIsValid ? amountError : ""}</p>
             </div>
+            <fieldset className="price-condition">
+              <legend>Claim condition</legend>
+              <div className="condition-fields">
+                <label>
+                  <span>Asset price</span>
+                  <select value={pricePairId} onChange={(event) => { setPricePairId(event.target.value); setTargetPrice(""); setTargetTouched(false); }} aria-label="Price pair">
+                    {MIDEN_PRICE_PAIRS.map((pair) => <option key={pair.id} value={pair.id}>{pair.id}</option>)}
+                  </select>
+                </label>
+                <label>
+                  <span>Reaches</span>
+                  <span className="target-price-input">
+                    <span aria-hidden="true">$</span>
+                    <input inputMode="decimal" value={targetPrice} placeholder={selectedPricePair.placeholder} onBlur={() => setTargetTouched(true)} onChange={(event) => { setTargetPrice(event.target.value); setTargetTouched(true); }} aria-label={`${selectedPricePair.baseSymbol} target price in US dollars`} aria-invalid={targetTouched && !targetIsValid} aria-describedby="target-price-error" />
+                  </span>
+                </label>
+              </div>
+              <p className="field-error" id="target-price-error" aria-live="polite">{targetTouched && !targetIsValid ? parsedTargetPrice.error : ""}</p>
+            </fieldset>
             <div className="composer-options">
-              <label><span>Expires after</span><select value={expirationDays} onChange={(event) => setExpirationDays(Number(event.target.value))} aria-label="Drop expiration">{EXPIRATIONS.map((option) => <option key={option.days} value={option.days}>{option.label}</option>)}</select></label>
+              <label><span>Sender recovers after</span><select value={expirationDays} onChange={(event) => setExpirationDays(Number(event.target.value))} aria-label="Sender recovery delay">{EXPIRATIONS.map((option) => <option key={option.days} value={option.days}>{option.label}</option>)}</select></label>
               <label><span>Message</span><input value={message} maxLength={42} onChange={(event) => setMessage(event.target.value)} placeholder="Optional" /></label>
             </div>
-            <button className="primary-button composer-submit" type="submit" disabled={!amountIsValid || busy || connectionPending} aria-busy={busy}>
+            <button className="primary-button composer-submit" type="submit" disabled={!amountIsValid || !targetIsValid || busy || connectionPending} aria-busy={busy}>
               <span>{phase === "creating" ? "Confirming private note…" : phase === "uploading" ? "Securing private link…" : connected ? "Create private link" : connectionPending ? "Connecting wallet…" : "Connect wallet to create"}</span>
               <Icon name={busy ? "lock" : "arrow"} />
             </button>
-            <p className="prototype-note"><Icon name="lock" size={14} /> Anyone with the complete link can claim this drop before it expires.</p>
+            <p className="prototype-note"><Icon name="lock" size={14} /> Before recovery, another bearer can claim when {selectedPricePair.id} reaches your target.</p>
           </form>
         </div>
       </section>
@@ -245,10 +289,11 @@ export default function SendPage() {
         <div className="result-copy">
           <p className="result-status"><span><Icon name="check" size={16} /></span>Your private drop is ready</p>
           <h2>{result?.amount ?? amount} {result?.symbol ?? selectedToken.symbol}, ready to share<span>.</span></h2>
+          {result && <p className="result-condition"><span>Unlocks when</span><strong>{result.pricePair} ≥ {result.targetPrice}</strong></p>}
           <p>The note is encrypted before it reaches Miden Drop. Send this bearer link only through a channel you trust.</p>
           <div className="link-output"><code>{linkRef.current}</code><button type="button" onClick={copyLink}><Icon name={copied ? "check" : "copy"} size={18} />{copied ? "Copied" : "Copy link"}</button></div>
           {linkRef.current && <Link className="text-action" href={linkRef.current}>Open claim page <Icon name="arrow" size={18} /></Link>}
-          {result && <p className="transaction-reference">Transaction {result.transactionId} · expires at block {result.expirationBlock.toLocaleString()}</p>}
+          {result && <p className="transaction-reference">Transaction {result.transactionId} · sender recovery at block {result.expirationBlock.toLocaleString()}</p>}
         </div>
         <div className="result-qr">{qrRef.current && <QrPreview source={qrRef.current} />}<span>Scan to open the private bearer link</span></div>
       </section>
