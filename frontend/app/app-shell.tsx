@@ -8,7 +8,7 @@ import { BrandMark, Icon } from "./ui";
 
 export default function AppShell({ children }: { children: ReactNode }) {
   const pathname = usePathname();
-  const { address, connectWallet, connected, error, pending, walletLabel } = useWalletConnection();
+  const { address, connectWallet, connected, disconnecting, disconnectWallet, error, pending, walletLabel } = useWalletConnection();
   const isLanding = pathname === "/";
 
   return (
@@ -21,7 +21,15 @@ export default function AppShell({ children }: { children: ReactNode }) {
           <span className="network-label"><span />Miden Testnet</span>
         </nav>
         {connected ? (
-          <div className="wallet-button is-connected" role="status" aria-label={`Wallet connected: ${address ?? "address available"}`}><Icon name="wallet" size={18} /><span className="wallet-label">{walletLabel}</span></div>
+          <div className="wallet-control">
+            <div className="wallet-status" role="status" aria-label={`Wallet connected: ${address ?? "address available"}`}>
+              <Icon name="wallet" size={18} />
+              <span className="wallet-address">{walletLabel}</span>
+            </div>
+            <button className="wallet-disconnect" type="button" onClick={disconnectWallet} disabled={disconnecting}>
+              {disconnecting ? "Disconnecting…" : "Disconnect"}
+            </button>
+          </div>
         ) : (
           <button className="wallet-button" type="button" onClick={connectWallet} disabled={pending}>
             <Icon name="wallet" size={18} />

@@ -19,6 +19,8 @@ export function useWalletConnection() {
     connect,
     connected,
     connecting,
+    disconnect,
+    disconnecting,
     select,
     wallet,
     wallets: availableWallets,
@@ -63,12 +65,25 @@ export function useWalletConnection() {
     }
   }
 
+  async function disconnectWallet() {
+    setError(null);
+    if (!connected || disconnecting) return;
+
+    try {
+      await disconnect();
+    } catch (disconnectError) {
+      setError(disconnectError instanceof Error ? disconnectError.message : "Could not disconnect the wallet. Try again.");
+    }
+  }
+
   return {
     address,
     connectWallet,
     connected,
+    disconnecting,
+    disconnectWallet,
     error,
-    pending: connecting || connectRequested,
+    pending: connecting || connectRequested || disconnecting,
     walletLabel: connecting || connectRequested ? "Connecting…" : connected ? shortAddress(address) : "Connect Wallet",
   };
 }

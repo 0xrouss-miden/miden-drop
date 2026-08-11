@@ -222,7 +222,7 @@ Icons are authored 1.6px SVG strokes with round caps and joins. They support lab
 
 ### Navigation
 
-The header uses a three-part grid on wide screens: brand, routed Send/Receive/Testnet navigation, and wallet state. Send and Receive always navigate to `/send` and `/receive`; neither is embedded into the landing. Links use a 1px vermilion underline that draws from left to right over 220ms and remains visible for the active route. Below 1120px the nav becomes a second ruled row; below 820px it scrolls horizontally if needed while the network label stays visible. A connected wallet is rendered as a status, not a toggle, so clicking the address can never disconnect the adapter. The wallet provider belongs to the persistent root layout, never an individual route: route transitions must not unmount the adapter or trigger a new authorization.
+The header uses a three-part grid on wide screens: brand, routed Send/Receive/Testnet navigation, and wallet state. Send and Receive always navigate to `/send` and `/receive`; neither is embedded into the landing. Links use a 1px vermilion underline that draws from left to right over 220ms and remains visible for the active route. Below 1120px the nav becomes a second ruled row; below 820px it scrolls horizontally if needed while the network label stays visible. A connected wallet uses a non-interactive address status paired with an explicit Disconnect button, so the address itself never behaves like an ambiguous toggle. On compact screens the address label collapses while the Disconnect action remains named and available. The wallet provider belongs to the persistent root layout, never an individual route: route transitions must not unmount the adapter or trigger a new authorization.
 
 ### Proof Field
 
