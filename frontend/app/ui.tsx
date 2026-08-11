@@ -1,4 +1,5 @@
 import type { ReactNode } from "react";
+import Image from "next/image";
 
 export type IconName = "arrow" | "back" | "check" | "copy" | "lock" | "scan" | "wallet";
 
@@ -51,20 +52,6 @@ export function ProofField() {
   );
 }
 
-const qrCells = Array.from({ length: 21 * 21 }, (_, index) => {
-  const row = Math.floor(index / 21);
-  const column = index % 21;
-  const inFinder = (originRow: number, originColumn: number) => {
-    const y = row - originRow;
-    const x = column - originColumn;
-    if (x < 0 || y < 0 || x > 6 || y > 6) return false;
-    return x === 0 || y === 0 || x === 6 || y === 6 || (x >= 2 && x <= 4 && y >= 2 && y <= 4);
-  };
-  return inFinder(0, 0) || inFinder(0, 14) || inFinder(14, 0) || ((index * 17 + row * row + column * 7) % 13 < 6);
-});
-
-export function QrPreview() {
-  return <div className="qr-preview" role="img" aria-label="Illustrative QR code for the generated drop">{qrCells.map((active, index) => <span className={active ? "is-active" : ""} key={index} />)}</div>;
+export function QrPreview({ source }: { source: string }) {
+  return <Image className="qr-preview" src={source} width={140} height={140} unoptimized alt="QR code containing the private drop link" />;
 }
-
-export const previewLink = "https://drop.miden.xyz/claim#7x8k9m2q";
