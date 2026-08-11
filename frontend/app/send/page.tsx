@@ -296,15 +296,19 @@ export default function SendPage() {
 
       <section id="drop-result" className={`drop-result${phase === "ready" ? " is-visible" : ""}`} aria-live="polite">
         <div className="result-copy">
-          <p className="result-status"><span><Icon name="check" size={16} /></span>Your private drop is ready</p>
-          <h2>{result?.amount ?? amount} {result?.symbol ?? selectedToken.symbol}, ready to share<span>.</span></h2>
+          <div className="result-heading">
+            <p className="result-status"><span><Icon name="check" size={18} /></span>Your private drop is ready</p>
+            <h2>{result?.amount ?? amount} {result?.symbol ?? selectedToken.symbol}, ready to share<span>.</span></h2>
+            <p>The note is encrypted before it reaches Miden Drop. Send this bearer link only through a channel you trust.</p>
+          </div>
           {result && <p className="result-condition"><span>Claim condition</span><strong>{result.pricePair ? `${result.pricePair} ≥ ${result.targetPrice}` : "Bearer link · no Oracle"}</strong></p>}
-          <p>The note is encrypted before it reaches Miden Drop. Send this bearer link only through a channel you trust.</p>
-          <div className="link-output"><code>{linkRef.current}</code><button type="button" onClick={copyLink}><Icon name={copied ? "check" : "copy"} size={18} />{copied ? "Copied" : "Copy link"}</button></div>
-          {linkRef.current && <Link className="text-action" href={linkRef.current}>Open claim page <Icon name="arrow" size={18} /></Link>}
-          {result && <p className="transaction-reference">Transaction {result.transactionId} · sender recovery at block {result.expirationBlock.toLocaleString()}</p>}
+          <div className="result-share">
+            <div className="link-output"><code>{linkRef.current}</code><button type="button" onClick={copyLink}><Icon name={copied ? "check" : "copy"} size={18} />{copied ? "Copied" : "Copy link"}</button></div>
+            {linkRef.current && <Link className="text-action" href={linkRef.current}>Open claim page <Icon name="arrow" size={18} /></Link>}
+          </div>
         </div>
         <div className="result-qr">{qrRef.current && <QrPreview source={qrRef.current} />}<span>Scan to open the private bearer link</span></div>
+        {result && <p className="transaction-reference"><Icon name="lock" size={14} />Transaction {result.transactionId} · sender recovery at block {result.expirationBlock.toLocaleString()}</p>}
       </section>
     </main>
   );
