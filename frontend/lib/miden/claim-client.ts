@@ -5,10 +5,11 @@ import { assertCurrentMidenRelease, base64UrlToBytes, type DropEnvelopeV1 } from
 import { findMidenPricePair } from "./price-pairs";
 import { canonicalMidenNoteId, midenNoteIdsEqual } from "./note-id";
 import { getOracleForeignAccounts } from "./oracle";
+import { createWalletTransactionBuilder } from "./wallet-transaction";
 
 type ClaimWallet = Pick<
   WalletContextState,
-  "address" | "importPrivateNote" | "requestTransaction" | "waitForTransaction"
+  "address" | "requestGuardianInfo" | "importPrivateNote" | "requestTransaction" | "waitForTransaction"
 >;
 
 export type ClaimProgress = "validating" | "importing" | "requesting" | "confirming";
@@ -33,7 +34,7 @@ export async function claimMidenDrop(
     importBytes = preparedNote.importBytes;
     completeNoteBytes = preparedNote.completeNoteBytes;
     const oracleTransaction = envelope.pricePair
-      ? await createOracleClaim(wallet.address, envelope, importBytes, completeNoteBytes)
+      ? await createOracleClaim(wallet, envelope, importBytes, completeNoteBytes)
       : undefined;
     try {
       onProgress?.("importing");
@@ -67,11 +68,12 @@ export async function claimMidenDrop(
 }
 
 async function createOracleClaim(
-  address: string | null,
+  wallet: ClaimWallet,
   envelope: DropEnvelopeV1,
   importBytes: Uint8Array,
   noteBytes: Uint8Array,
 ) {
+  const { address } = wallet;
   if (!address) throw new Error("Connect a Miden wallet before claiming this drop.");
   const sdk = await import("@miden-sdk/miden-sdk/lazy");
   const rpc = new sdk.RpcClient(new sdk.Endpoint("https://rpc.testnet.miden.io"));
@@ -92,7 +94,7 @@ async function createOracleClaim(
       if (!note || !proof) throw new Error("The private drop is missing its inclusion proof.");
       const foreignAccounts = await getOracleForeignAccounts(rpc, pair, sdk);
       const input = sdk.InputNote.authenticated(note, proof);
-      const builder = new sdk.TransactionRequestBuilder();
+      const builder = await createWalletTransactionBuilder(wallet, sdk);
       const withNote = builder.withExplicitInputNote(input);
       const withForeign = withNote.withForeignAccounts(new sdk.ForeignAccountArray(foreignAccounts));
       const request = withForeign.build();

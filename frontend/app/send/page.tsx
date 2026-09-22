@@ -49,7 +49,7 @@ export default function SendPage() {
   const scrollTimer = useRef<number | null>(null);
   const copiedTimer = useRef<number | null>(null);
   const balanceRequestRef = useRef("");
-  const { address, connected, requestAssets, requestTransaction, waitForTransaction } = useWallet();
+  const { address, connected, requestAssets, requestGuardianInfo, requestTransaction, waitForTransaction } = useWallet();
   const { connectWallet, error: connectionError, pending: connectionPending } = useWalletConnection();
   const selectedToken = MIDEN_TOKENS.find((token) => token.faucetId === tokenId) ?? MIDEN_TOKENS[0];
   const selectedPricePair = findMidenPricePair(pricePairId);
@@ -142,7 +142,7 @@ export default function SendPage() {
     pendingUploadRef.current = null;
     try {
       const commonDropInput = {
-        wallet: { address, requestTransaction, waitForTransaction },
+        wallet: { address, requestGuardianInfo, requestTransaction, waitForTransaction },
         amount: parsedAmount.units,
         expirationDays,
         message: message.trim() || undefined,

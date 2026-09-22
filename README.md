@@ -13,7 +13,7 @@ Private bearer drops on **Miden testnet v0.16**, with optional BTC/USD or ETH/US
 
 The September 2026 testnet reset invalidated v0.15 accounts and notes. Existing encrypted links remain readable, but cannot be redeemed on v0.16. Create new drops using a wallet compatible with v0.16 and the current token faucets. New envelopes include `midenRelease: "0.16"`; the public-chain browser cache uses a separate v0.16 database.
 
-Transactions require the native fee asset (MIDEN). Connect a compatible Basic Wallet with funds for the drop and transaction fees. The app delegates signing, execution, proving, and submission to the wallet. Custom requests currently target single-signature wallets; multisig fee-salt coordination is outside this app's supported flow.
+Transactions require the native fee asset (MIDEN). Connect a compatible Basic Wallet with funds for the drop and transaction fees. The app delegates signing, execution, proving, and submission to the wallet. Custom requests support ordinary and guardian wallets: the app reads `requestGuardianInfo()` and declares a fresh cryptographically random fee conversion salt for each guarded-multisig request. The wallet coordinates guardian signatures over that same request.
 
 ## Run locally
 

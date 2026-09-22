@@ -26,7 +26,7 @@ export default function ClaimPage() {
   const [completedAsRecovery, setCompletedAsRecovery] = useState(false);
   const envelopeRef = useRef<DropEnvelopeV1 | null>(null);
   const currentBlockRef = useRef(0);
-  const { address, importPrivateNote, requestTransaction, waitForTransaction } = useWallet();
+  const { address, requestGuardianInfo, importPrivateNote, requestTransaction, waitForTransaction } = useWallet();
   const { connectWallet, connected, error: connectionError, pending } = useWalletConnection();
   const pageTitle = phase === "claimed"
     ? completedAsRecovery ? "Drop recovered" : "Drop claimed"
@@ -101,7 +101,7 @@ export default function ClaimPage() {
       setPhase("claiming");
       setClaimProgress("validating");
       await claimMidenDrop(
-        { address, importPrivateNote, requestTransaction, waitForTransaction },
+        { address, requestGuardianInfo, importPrivateNote, requestTransaction, waitForTransaction },
         currentEnvelope,
         setClaimProgress,
       );

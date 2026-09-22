@@ -8,6 +8,7 @@ const RECOVERY_BLOCK = 100;
 const RAW_TARGET = BigInt("6500000000000");
 const storageState = vi.hoisted(() => ({
   block: 0,
+  declaredSalt: [] as bigint[],
   current: [BigInt(100), BigInt(1), BigInt(0), BigInt("6500000000000")],
 }));
 
@@ -81,6 +82,11 @@ vi.mock("@miden-sdk/miden-sdk/lazy", () => {
   }
 
   return {
+    Word: class Word {
+      constructor(private elements: BigUint64Array) {}
+      toU64s() { return this.elements; }
+      free() {}
+    },
     MidenClient: { ready: vi.fn().mockResolvedValue(undefined) },
     Note,
     NoteFile,
@@ -96,6 +102,10 @@ vi.mock("@miden-sdk/miden-sdk/lazy", () => {
     },
     ForeignAccountArray: class ForeignAccountArray {},
     TransactionRequestBuilder: class TransactionRequestBuilder {
+      withFeeConversionSalt(salt: { toU64s(): BigUint64Array }) {
+        storageState.declaredSalt = Array.from(salt.toU64s());
+        return this;
+      }
       withExplicitInputNote() { return this; }
       withForeignAccounts() { return this; }
       build() { return { serialize: () => new Uint8Array([4, 5]), free: vi.fn() }; }
@@ -117,6 +127,8 @@ vi.mock("@miden-sdk/miden-sdk/lazy", () => {
 import { claimMidenDrop } from "./claim-client";
 import { getOracleForeignAccounts } from "./oracle";
 
+const requestGuardianInfo = vi.fn().mockResolvedValue({ isGuardianAccount: false });
+
 function envelope(bytes: Uint8Array): DropEnvelopeV1 {
   return {
     version: 1,
@@ -136,10 +148,13 @@ describe("claimMidenDrop note payloads", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     storageState.block = 0;
+    storageState.declaredSalt = [];
+    requestGuardianInfo.mockResolvedValue({ isGuardianAccount: false });
     storageState.current = [BigInt(RECOVERY_BLOCK), BigInt(1), BigInt(0), RAW_TARGET];
   });
 
-  it("imports an authenticated NoteFile and consumes the exact complete note bytes", async () => {
+  it.each([false, true])("imports a NoteFile and prepares a price claim for guardian=%s", async (guardian) => {
+    requestGuardianInfo.mockResolvedValue({ isGuardianAccount: guardian });
     let importedBytes: Uint8Array | undefined;
     let consumedBytes: string | undefined;
     const importPrivateNote = vi.fn().mockImplementation(async (value: Uint8Array) => {
@@ -154,13 +169,15 @@ describe("claimMidenDrop note payloads", () => {
     const bytes = new Uint8Array([1, 7, 9]);
 
     await expect(claimMidenDrop(
-      { address: "mtst1wallet", importPrivateNote, requestTransaction, waitForTransaction },
+      { address: "mtst1wallet", requestGuardianInfo, importPrivateNote, requestTransaction, waitForTransaction },
       envelope(bytes),
     )).resolves.toBe("tx-1");
 
     expect(importPrivateNote).toHaveBeenCalledOnce();
     expect(importedBytes).toEqual(new Uint8Array([3, 7, 9]));
     expect(consumedBytes).toBe("AQcJ");
+    expect(requestGuardianInfo).toHaveBeenCalledOnce();
+    expect(storageState.declaredSalt).toHaveLength(guardian ? 4 : 0);
   });
 
   it("rejects a details-only legacy private note instead of importing an ID-only file", async () => {
@@ -169,7 +186,7 @@ describe("claimMidenDrop note payloads", () => {
     const waitForTransaction = vi.fn();
 
     await expect(claimMidenDrop(
-      { address: "mtst1wallet", importPrivateNote, requestTransaction, waitForTransaction },
+      { address: "mtst1wallet", requestGuardianInfo, importPrivateNote, requestTransaction, waitForTransaction },
       envelope(new Uint8Array([2, 7, 9])),
     )).rejects.toThrow("legacy private drop does not contain the complete note");
 
@@ -184,7 +201,7 @@ describe("claimMidenDrop note payloads", () => {
     const mismatched = { ...envelope(new Uint8Array([1, 7, 9])), pricePair: "ETH/USD" as const };
 
     await expect(claimMidenDrop(
-      { address: "mtst1wallet", importPrivateNote, requestTransaction, waitForTransaction },
+      { address: "mtst1wallet", requestGuardianInfo, importPrivateNote, requestTransaction, waitForTransaction },
       mismatched,
     )).rejects.toThrow("note conditions do not match");
 
@@ -203,28 +220,32 @@ describe("claimMidenDrop note payloads", () => {
     delete plain.rawTargetPrice;
 
     await expect(claimMidenDrop(
-      { address: "mtst1wallet", importPrivateNote, requestTransaction, waitForTransaction },
+      { address: "mtst1wallet", requestGuardianInfo, importPrivateNote, requestTransaction, waitForTransaction },
       plain,
     )).resolves.toBe("tx-plain");
     expect(getOracleForeignAccounts).not.toHaveBeenCalled();
+    expect(requestGuardianInfo).not.toHaveBeenCalled();
   });
 
   it.each([RECOVERY_BLOCK, RECOVERY_BLOCK + 1])("bypasses Pragma for sender recovery at block %i", async (block) => {
     storageState.block = block;
     const wallet = {
       address: "mtst1wallet",
+      requestGuardianInfo,
       importPrivateNote: vi.fn().mockResolvedValue(NOTE_ID),
       requestTransaction: vi.fn().mockResolvedValue("tx-recover"),
       waitForTransaction: vi.fn().mockResolvedValue({}),
     };
     await expect(claimMidenDrop(wallet, envelope(new Uint8Array([1, 7, 9])))).resolves.toBe("tx-recover");
     expect(getOracleForeignAccounts).not.toHaveBeenCalled();
+    expect(requestGuardianInfo).not.toHaveBeenCalled();
     expect(wallet.requestTransaction.mock.calls[0][0].payload.noteBytes).toBe("AQcJ");
   });
 
   it("uses raw note bytes when the envelope contains a complete NoteFile", async () => {
     const wallet = {
       address: "mtst1wallet",
+      requestGuardianInfo,
       importPrivateNote: vi.fn().mockResolvedValue(NOTE_ID),
       requestTransaction: vi.fn().mockResolvedValue("tx-file"),
       waitForTransaction: vi.fn().mockResolvedValue({}),
@@ -236,6 +257,7 @@ describe("claimMidenDrop note payloads", () => {
   it("rejects links from the previous testnet before requesting wallet actions", async () => {
     const wallet = {
       address: "mtst1wallet",
+      requestGuardianInfo,
       importPrivateNote: vi.fn(),
       requestTransaction: vi.fn(),
       waitForTransaction: vi.fn(),

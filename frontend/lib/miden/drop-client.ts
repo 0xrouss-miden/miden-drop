@@ -6,12 +6,13 @@ import { expirationBlockFromDays } from "@/lib/drop/amount";
 import { bytesToBase64Url, DROP_MIDEN_RELEASE, type DropEnvelopeV1 } from "@/lib/drop/protocol";
 import { DROP_NOTE_SOURCE } from "./drop-note-source";
 import { findMidenPricePair, type MidenPricePairId } from "./price-pairs";
+import { createWalletTransactionBuilder } from "./wallet-transaction";
 
 const DROP_NOTE_TAG = 0x4d44524f;
 let clientPromise: Promise<Awaited<ReturnType<typeof createClient>>> | undefined;
 let scriptPromise: Promise<NoteScript> | undefined;
 
-type WalletActions = Pick<WalletContextState, "address" | "requestTransaction" | "waitForTransaction">;
+type WalletActions = Pick<WalletContextState, "address" | "requestGuardianInfo" | "requestTransaction" | "waitForTransaction">;
 
 type CreateMidenDropBaseInput = {
   wallet: WalletActions;
@@ -69,14 +70,17 @@ export async function createMidenDrop(input: CreateMidenDropInput): Promise<{
   // NoteFile.fromInputNote() may downgrade an unauthenticated private note to a
   // details-only export, which a fresh recipient wallet cannot import.
   const noteBytes = note.serialize();
-  const request = new sdk.TransactionRequestBuilder()
-    .withOwnOutputNotes(new sdk.NoteArray([note]))
-    .build();
-  const walletTransaction = WalletTransaction.createCustomTransaction(
-    wallet.address,
-    wallet.address,
-    request,
-  );
+  const builder = await createWalletTransactionBuilder(wallet, sdk);
+  const withOutputs = builder.withOwnOutputNotes(new sdk.NoteArray([note]));
+  const request = withOutputs.build();
+  let walletTransaction;
+  try {
+    walletTransaction = WalletTransaction.createCustomTransaction(wallet.address, wallet.address, request);
+  } finally {
+    request.free();
+    withOutputs.free();
+    builder.free();
+  }
   const transactionId = await wallet.requestTransaction(walletTransaction);
   const result = await wallet.waitForTransaction(transactionId, 180_000);
   const output = result.outputNotes.find((candidate) => candidate.id().toString() === noteId);

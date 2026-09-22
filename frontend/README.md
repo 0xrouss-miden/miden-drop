@@ -16,6 +16,7 @@ bun run dev
 - `lib/miden/config.ts` contains the current testnet faucets. `lib/miden/oracle.ts` and the MASM source pin the current Pragma account and procedure root. See the [contract documentation](../chain/contracts/drop-note/README.md).
 - `next.config.ts` aliases the SDK root import to its lazy browser build. v0.16's default Node entry loads a native addon, so wallet adapters must resolve to the browser build even during Next.js server rendering. Import adapter APIs through their public package exports.
 - `@miden-sdk/react` is required by the adapter's root exports. Keep all Miden JavaScript packages on the same release.
+- `lib/miden/wallet-transaction.ts` checks `requestGuardianInfo()` for every custom request. Guardian wallets receive a fresh fee conversion salt that survives serialization and remains fixed through signing; ordinary wallets keep the SDK's default. The app cannot call `feeAwareTransactionRequestBuilder(account)` because the executing private account is held by the extension, not the public-chain client.
 
 The public-chain cache is isolated in `miden-drop-public-chain-v0.16`. Drops from previous testnet releases cannot be redeemed after the network reset. Current wallets need MIDEN for fees, including when sending USDC or ETH.
 
