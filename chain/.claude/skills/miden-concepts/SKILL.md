@@ -21,7 +21,7 @@ Key properties:
 | Transactions involve sender + receiver | Transactions involve **one account only** |
 | Public state by default | **Private by default** |
 | Validators execute transactions | **Client executes and proves** locally |
-| Gas metering | No gas (computational bounds exist) |
+| Gas metering | Protocol fees paid in the native asset; execution also has resource bounds |
 | Synchronous contract calls | **Asynchronous** communication via notes |
 | Accounts are balances + storage | Accounts are **full smart contracts** with code, storage, and vault |
 

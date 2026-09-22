@@ -2,7 +2,7 @@ use miden::protocol::active_account
 use miden::protocol::account_id
 use miden::protocol::active_note
 use miden::protocol::tx
-use miden::standards::wallets::basic->basic_wallet
+use miden::standards::wallets::basic as basic_wallet
 
 const ERR_DROP_NOTE_UNEXPECTED_STORAGE="Miden Drop note expects exactly four storage items"
 const ERR_DROP_NOTE_INVALID_EXPIRATION="Miden Drop note requires a recovery block"
@@ -22,8 +22,8 @@ const ERR_DROP_NOTE_PRICE_TOO_LOW="Pragma price has not reached the Miden Drop t
 #! original sender may recover it.
 #!
 #! Pragma deployment pinned by this script:
-#! - Oracle: 0x7ad4aa02b1816c117e32853e210c28
-#! - get_median: 0xaa3a12d4e9de2dad37c50dba93809b9c17226d512e642d3d620c77088a85da71
+#! - Oracle: 0x3b306d819a19b691205480e1619b5c
+#! - get_median: 0xab62a61417fb6c1edc191d24b6a3cc53b2071e671d7013ddd26860267b960b29
 #!
 #! Requires the consuming account to expose the standard Basic Wallet `receive_asset` procedure.
 #!
@@ -60,12 +60,12 @@ pub proc claim
     if.true
         exec.active_account::get_id
         exec.active_note::get_sender
-        exec.account_id::is_equal assert.err=ERR_DROP_NOTE_RECIPIENT_EXPIRED
+        exec.account_id::eq assert.err=ERR_DROP_NOTE_RECIPIENT_EXPIRED
     else
         # The creating account is explicitly locked out during the recipient claim window.
         exec.active_account::get_id
         exec.active_note::get_sender
-        exec.account_id::is_equal assertz.err=ERR_DROP_NOTE_SENDER_LOCKED
+        exec.account_id::eq assertz.err=ERR_DROP_NOTE_SENDER_LOCKED
 
         # A zero pair prefix marks a plain bearer drop and skips all foreign-account work.
         mem_load.1 eq.0
@@ -75,8 +75,8 @@ pub proc claim
             push.0.0 mem_load.2 mem_load.1
 
             # Select Pragma get_median and its deployed public Oracle account.
-            push.0xaa3a12d4e9de2dad37c50dba93809b9c17226d512e642d3d620c77088a85da71
-            push.8850886096234572817.9093477099503364096
+            push.0xab62a61417fb6c1edc191d24b6a3cc53b2071e671d7013ddd26860267b960b29
+            push.4265029250523444881.2329628612750957568
             exec.tx::execute_foreign_procedure
 
             # Outputs begin [is_tracked, median_price, amount=0, pad(13)].
@@ -90,5 +90,5 @@ pub proc claim
         end
     end
 
-    exec.basic_wallet::add_assets_to_account
+    exec.basic_wallet::move_note_assets_to_account
 end

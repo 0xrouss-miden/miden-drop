@@ -1,36 +1,31 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Miden Drop frontend
 
-## Getting Started
+Next.js application using the Miden SDK and wallet adapters **0.16.2** on Miden testnet v0.16. Use Bun 1.3.14 and a PostgreSQL `DATABASE_URL` as shown in `.env.example`.
 
-First, run the development server:
-
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+```sh
+bun install --frozen-lockfile
+bun run db:migrate
+bun run dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+## Miden integration
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+- `lib/miden/drop-client.ts` compiles the canonical note script, builds a private output note, and asks the connected wallet to submit it. Complete `Note` bytes are encrypted in the drop envelope.
+- `lib/miden/claim-client.ts` validates the note's assets and immutable conditions, fetches an inclusion proof, imports an authenticated `NoteFile`, and submits the claim through the wallet.
+- Price-gated claims declare Pragma and all active publishers as public foreign accounts. `lib/miden/oracle.ts` selects the registry and pair storage keys; the wallet obtains proofs at its transaction reference block. Recovery at or after the expiration block bypasses Pragma.
+- `lib/miden/config.ts` contains the current testnet faucets. `lib/miden/oracle.ts` and the MASM source pin the current Pragma account and procedure root. See the [contract documentation](../chain/contracts/drop-note/README.md).
+- `next.config.ts` aliases the SDK root import to its lazy browser build. v0.16's default Node entry loads a native addon, so wallet adapters must resolve to the browser build even during Next.js server rendering. Import adapter APIs through their public package exports.
+- `@miden-sdk/react` is required by the adapter's root exports. Keep all Miden JavaScript packages on the same release.
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+The public-chain cache is isolated in `miden-drop-public-chain-v0.16`. Drops from previous testnet releases cannot be redeemed after the network reset. Current wallets need MIDEN for fees, including when sending USDC or ETH.
 
-## Learn More
+## Checks
 
-To learn more about Next.js, take a look at the following resources:
+```sh
+bun run typecheck
+bun run lint
+bun run test
+bun run build
+```
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
-
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
-
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+The source parity test keeps `lib/miden/drop-note-source.ts` identical to `../chain/contracts/drop-note/src/drop_note.masm`. The Oracle tests use the actual v0.16 browser WASM to check ownership and transaction serialization; wallet interactions are mocked. Run the read-only deployment check from `../chain` with `cargo run -p integration --example verify_testnet --release --locked`.

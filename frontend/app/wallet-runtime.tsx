@@ -7,7 +7,7 @@ import {
   WalletAdapterNetwork,
 } from "@miden-sdk/miden-wallet-adapter-base";
 import { MidenWalletAdapter } from "@miden-sdk/miden-wallet-adapter-miden";
-import { WalletProvider } from "@miden-sdk/miden-wallet-adapter-react/dist/WalletProvider.js";
+import { WalletProvider } from "@miden-sdk/miden-wallet-adapter-react";
 
 const wallets = [new MidenWalletAdapter({ appName: "Miden Drop" })];
 

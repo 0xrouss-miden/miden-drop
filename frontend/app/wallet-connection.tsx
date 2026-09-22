@@ -6,7 +6,7 @@ import {
   PrivateDataPermission,
   WalletAdapterNetwork,
 } from "@miden-sdk/miden-wallet-adapter-base";
-import { useWallet } from "@miden-sdk/miden-wallet-adapter-react/dist/useWallet.js";
+import { useWallet } from "@miden-sdk/miden-wallet-adapter-react";
 
 function shortAddress(address?: string | null) {
   if (!address) return "Connected";

@@ -4,7 +4,7 @@ import { FormEvent, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import QRCode from "qrcode";
 import type { Asset } from "@miden-sdk/miden-wallet-adapter-base";
-import { useWallet } from "@miden-sdk/miden-wallet-adapter-react/dist/useWallet.js";
+import { useWallet } from "@miden-sdk/miden-wallet-adapter-react";
 
 import { uploadEncryptedDrop } from "@/lib/drop/api";
 import { formatDecimalUnits, parseDecimalUnits } from "@/lib/drop/amount";

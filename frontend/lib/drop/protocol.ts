@@ -3,10 +3,13 @@ import { isMidenPricePairId, type MidenPricePairId } from "@/lib/miden/price-pai
 export const DROP_PROTOCOL_VERSION = 1 as const;
 export const DROP_NETWORK = "testnet" as const;
 export const DROP_AAD = "miden-drop:v1:testnet";
+export const DROP_MIDEN_RELEASE = "0.16" as const;
 
 export type DropEnvelopeV1 = {
   version: typeof DROP_PROTOCOL_VERSION;
   network: typeof DROP_NETWORK;
+  // Optional only so old links can be decrypted and identified as incompatible.
+  midenRelease?: typeof DROP_MIDEN_RELEASE;
   noteFile: string;
   noteId: string;
   faucetId: string;
@@ -16,6 +19,17 @@ export type DropEnvelopeV1 = {
   rawTargetPrice?: string;
   message?: string;
 };
+
+export class IncompatibleMidenReleaseError extends Error {
+  constructor() {
+    super("This drop was created for an older Miden testnet. Ask the sender to create a new drop for Miden 0.16.");
+    this.name = "IncompatibleMidenReleaseError";
+  }
+}
+
+export function assertCurrentMidenRelease(envelope: DropEnvelopeV1) {
+  if (envelope.midenRelease !== DROP_MIDEN_RELEASE) throw new IncompatibleMidenReleaseError();
+}
 
 export type EncryptedDrop = {
   version: typeof DROP_PROTOCOL_VERSION;
@@ -70,6 +84,7 @@ export function isDropEnvelope(value: unknown): value is DropEnvelopeV1 {
   const hasPriceCondition = envelope.pricePair !== undefined || envelope.rawTargetPrice !== undefined;
   return envelope.version === DROP_PROTOCOL_VERSION
     && envelope.network === DROP_NETWORK
+    && (envelope.midenRelease === undefined || envelope.midenRelease === DROP_MIDEN_RELEASE)
     && typeof envelope.noteFile === "string"
     && typeof envelope.noteId === "string"
     && typeof envelope.faucetId === "string"

@@ -1,56 +1,37 @@
 ---
 name: drop-note-testing
-description: Test the Miden Drop MASM note with MockChain and NoteBuilder, covering permanent notes, expiration boundaries, unauthorized claims, sender reclaim, and asset deltas.
+description: Test the Miden Drop v0.16 note with MockChain, including private notes, Pragma conditions, recovery boundaries, and asset patches.
 ---
 
 # Miden Drop Note Testing
 
-The canonical suite is `integration/tests/drop_note_test.rs`.
+The canonical suite is `integration/tests/drop_note_test.rs`. Compile local MASM with `NoteBuilder`,
+set `.note_type(NoteType::Private)`, and provide four storage Felts:
+`[recovery_block, pair_prefix, pair_suffix, raw_target_price]`. Recovery block must be non-zero.
 
-## Constructing a note
+Seed notes with `builder.add_output_note(RawOutputNote::Full(note.clone()))` before building the
+chain. In v0.16, execute via `mock_chain.build_transaction(consumer_id)` and
+`.authenticated_input_note(note.id())`. Add foreign-account inputs only in tests that require them.
+Mock Oracle exports need `@account_procedure`; replace the deployed Oracle ID and root in the
+script with those of the mock component.
 
-Compile the local MASM source through `NoteBuilder`:
+Genesis is block 0. `prove_until_block(n)` makes block `n` the transaction reference block.
+Check these behavior boundaries when relevant:
 
-```rust
-const DROP_NOTE_SCRIPT: &str =
-    include_str!("../../contracts/drop-note/src/drop_note.masm");
+- Plain bearer claims with zero Oracle fields.
+- BTC/USD and ETH/USD claims, equality and below-target rejection.
+- Unsupported pairs and partial conditions.
+- Sender lockout before recovery.
+- Non-sender rejection at the recovery block.
+- Sender recovery at and after that block without any Oracle inputs.
+- Received assets via `executed_transaction.account_patch().vault().updated_assets()`.
 
-let note = NoteBuilder::new(sender.id(), &mut note_rng)
-    .code(DROP_NOTE_SCRIPT)
-    .note_storage([Felt::from(expiration_block)])?
-    .add_assets([asset])
-    .build()?;
-```
-
-Every note must supply one storage item. Use zero for no expiration; do not omit storage.
-
-Seed the note before building the chain:
-
-```rust
-builder.add_output_note(RawOutputNote::Full(note.clone()));
-let mock_chain = builder.build()?;
-```
-
-## Reference-block behavior
-
-Genesis is block 0. `prove_until_block(n)` advances the chain so transactions use block `n` as
-their reference block. Because expiration is inclusive, a non-sender claim at exactly the configured
-block must fail.
-
-## Required cases
-
-- `expiration_block = 0` remains claimable after advancing beyond arbitrary blocks.
-- A non-sender can claim before a non-zero expiration block.
-- A non-sender cannot claim at the expiration block.
-- The original sender can reclaim at the expiration block.
-- Successful claims add the expected asset to `executed_transaction.account_delta().vault()`.
-
-When extending asset support, add mixed fungible/non-fungible and multi-asset coverage without
-weakening the four lifecycle cases.
-
-## Commands
+Run from `chain/` so rustup selects Rust 1.98.1:
 
 ```sh
-cargo fmt --manifest-path integration/Cargo.toml -- --check
-cargo test -p integration --test drop_note_test --release
+cargo fmt --all -- --check
+cargo test -p integration --test drop_note_test --release --locked
 ```
+
+`cargo run -p integration --example verify_testnet --release --locked` separately checks the live
+faucets and pinned Pragma procedure using read-only RPC. It does not sign or submit transactions.

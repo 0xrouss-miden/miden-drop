@@ -7,8 +7,11 @@ const FAUCET_ID = "mtst1test-faucet";
 const RECOVERY_BLOCK = 100;
 const RAW_TARGET = BigInt("6500000000000");
 const storageState = vi.hoisted(() => ({
+  block: 0,
   current: [BigInt(100), BigInt(1), BigInt(0), BigInt("6500000000000")],
 }));
+
+vi.mock("./oracle", () => ({ getOracleForeignAccounts: vi.fn().mockResolvedValue([]) }));
 
 function freeableId(value: string) {
   return { toString: () => value, free: vi.fn() };
@@ -46,13 +49,17 @@ vi.mock("@miden-sdk/miden-sdk/lazy", () => {
       };
     }
 
+    serialize() { return new Uint8Array([1, 7, 9]); }
+
     free() {}
   }
 
   class NoteFile {
+    constructor(private complete = false) {}
+    inclusionProof() { return { free: vi.fn() }; }
     static deserialize(bytes: Uint8Array) {
-      if (bytes[0] !== 2) throw new Error("not a note file");
-      return new NoteFile();
+      if (bytes[0] !== 2 && bytes[0] !== 3) throw new Error("not a note file");
+      return new NoteFile(bytes[0] === 3);
     }
 
     static fromInputNote() {
@@ -63,7 +70,7 @@ vi.mock("@miden-sdk/miden-sdk/lazy", () => {
     }
 
     note() {
-      return undefined;
+      return this.complete ? new Note() : undefined;
     }
 
     noteDetails() {
@@ -80,10 +87,18 @@ vi.mock("@miden-sdk/miden-sdk/lazy", () => {
     NoteId: { fromHex: () => freeableId(NOTE_ID) },
     Endpoint: class Endpoint {},
     RpcClient: class RpcClient {
+      async getBlockHeaderByNumber() { return { blockNum: () => storageState.block, free: vi.fn() }; }
       async getNotesById() {
-        return [{ inclusionProof: {}, free: vi.fn() }];
+        return [{ inclusionProof: { free: vi.fn() }, free: vi.fn() }];
       }
 
+      free() {}
+    },
+    ForeignAccountArray: class ForeignAccountArray {},
+    TransactionRequestBuilder: class TransactionRequestBuilder {
+      withExplicitInputNote() { return this; }
+      withForeignAccounts() { return this; }
+      build() { return { serialize: () => new Uint8Array([4, 5]), free: vi.fn() }; }
       free() {}
     },
     InputNote: {
@@ -100,11 +115,13 @@ vi.mock("@miden-sdk/miden-sdk/lazy", () => {
 });
 
 import { claimMidenDrop } from "./claim-client";
+import { getOracleForeignAccounts } from "./oracle";
 
 function envelope(bytes: Uint8Array): DropEnvelopeV1 {
   return {
     version: 1,
     network: "testnet",
+    midenRelease: "0.16",
     noteFile: bytesToBase64Url(bytes),
     noteId: NOTE_ID,
     faucetId: FAUCET_ID,
@@ -118,6 +135,7 @@ function envelope(bytes: Uint8Array): DropEnvelopeV1 {
 describe("claimMidenDrop note payloads", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    storageState.block = 0;
     storageState.current = [BigInt(RECOVERY_BLOCK), BigInt(1), BigInt(0), RAW_TARGET];
   });
 
@@ -129,14 +147,14 @@ describe("claimMidenDrop note payloads", () => {
       return NOTE_ID;
     });
     const requestTransaction = vi.fn().mockImplementation(async (transaction) => {
-      consumedBytes = transaction.payload.noteBytes;
+      consumedBytes = transaction.payload.importNotes?.[0] ?? transaction.payload.noteBytes;
       return "tx-1";
     });
     const waitForTransaction = vi.fn().mockResolvedValue({});
     const bytes = new Uint8Array([1, 7, 9]);
 
     await expect(claimMidenDrop(
-      { importPrivateNote, requestTransaction, waitForTransaction },
+      { address: "mtst1wallet", importPrivateNote, requestTransaction, waitForTransaction },
       envelope(bytes),
     )).resolves.toBe("tx-1");
 
@@ -151,7 +169,7 @@ describe("claimMidenDrop note payloads", () => {
     const waitForTransaction = vi.fn();
 
     await expect(claimMidenDrop(
-      { importPrivateNote, requestTransaction, waitForTransaction },
+      { address: "mtst1wallet", importPrivateNote, requestTransaction, waitForTransaction },
       envelope(new Uint8Array([2, 7, 9])),
     )).rejects.toThrow("legacy private drop does not contain the complete note");
 
@@ -166,7 +184,7 @@ describe("claimMidenDrop note payloads", () => {
     const mismatched = { ...envelope(new Uint8Array([1, 7, 9])), pricePair: "ETH/USD" as const };
 
     await expect(claimMidenDrop(
-      { importPrivateNote, requestTransaction, waitForTransaction },
+      { address: "mtst1wallet", importPrivateNote, requestTransaction, waitForTransaction },
       mismatched,
     )).rejects.toThrow("note conditions do not match");
 
@@ -185,8 +203,47 @@ describe("claimMidenDrop note payloads", () => {
     delete plain.rawTargetPrice;
 
     await expect(claimMidenDrop(
-      { importPrivateNote, requestTransaction, waitForTransaction },
+      { address: "mtst1wallet", importPrivateNote, requestTransaction, waitForTransaction },
       plain,
     )).resolves.toBe("tx-plain");
+    expect(getOracleForeignAccounts).not.toHaveBeenCalled();
+  });
+
+  it.each([RECOVERY_BLOCK, RECOVERY_BLOCK + 1])("bypasses Pragma for sender recovery at block %i", async (block) => {
+    storageState.block = block;
+    const wallet = {
+      address: "mtst1wallet",
+      importPrivateNote: vi.fn().mockResolvedValue(NOTE_ID),
+      requestTransaction: vi.fn().mockResolvedValue("tx-recover"),
+      waitForTransaction: vi.fn().mockResolvedValue({}),
+    };
+    await expect(claimMidenDrop(wallet, envelope(new Uint8Array([1, 7, 9])))).resolves.toBe("tx-recover");
+    expect(getOracleForeignAccounts).not.toHaveBeenCalled();
+    expect(wallet.requestTransaction.mock.calls[0][0].payload.noteBytes).toBe("AQcJ");
+  });
+
+  it("uses raw note bytes when the envelope contains a complete NoteFile", async () => {
+    const wallet = {
+      address: "mtst1wallet",
+      importPrivateNote: vi.fn().mockResolvedValue(NOTE_ID),
+      requestTransaction: vi.fn().mockResolvedValue("tx-file"),
+      waitForTransaction: vi.fn().mockResolvedValue({}),
+    };
+    await expect(claimMidenDrop(wallet, envelope(new Uint8Array([3, 7, 9])))).resolves.toBe("tx-file");
+    expect(wallet.requestTransaction.mock.calls[0][0].payload.importNotes).toEqual(["AQcJ"]);
+  });
+
+  it("rejects links from the previous testnet before requesting wallet actions", async () => {
+    const wallet = {
+      address: "mtst1wallet",
+      importPrivateNote: vi.fn(),
+      requestTransaction: vi.fn(),
+      waitForTransaction: vi.fn(),
+    };
+    const legacy = envelope(new Uint8Array([1, 7, 9]));
+    delete legacy.midenRelease;
+    await expect(claimMidenDrop(wallet, legacy)).rejects.toThrow("older Miden testnet");
+    expect(wallet.importPrivateNote).not.toHaveBeenCalled();
+    expect(wallet.requestTransaction).not.toHaveBeenCalled();
   });
 });

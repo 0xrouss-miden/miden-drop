@@ -6,6 +6,7 @@ use miden_client::{
     asset::{Asset, FungibleAsset},
     auth::AuthSchemeId,
     crypto::RandomCoin,
+    note::NoteType,
     transaction::{ExecutedTransaction, RawOutputNote},
     Felt, Word,
 };
@@ -22,11 +23,11 @@ const ETH_PRICE: u64 = 210_000_000_000;
 const BTC_TARGET: u64 = 6_500_000_000_000;
 const ETH_TARGET: u64 = 200_000_000_000;
 
-const PRAGMA_ORACLE_ID: &str = "0x7ad4aa02b1816c117e32853e210c28";
-const PRAGMA_ORACLE_PREFIX: &str = "8850886096234572817";
-const PRAGMA_ORACLE_SUFFIX: &str = "9093477099503364096";
+const PRAGMA_ORACLE_ID: &str = "0x3b306d819a19b691205480e1619b5c";
+const PRAGMA_ORACLE_PREFIX: &str = "4265029250523444881";
+const PRAGMA_ORACLE_SUFFIX: &str = "2329628612750957568";
 const PRAGMA_GET_MEDIAN_ROOT: &str =
-    "0xaa3a12d4e9de2dad37c50dba93809b9c17226d512e642d3d620c77088a85da71";
+    "0xab62a61417fb6c1edc191d24b6a3cc53b2071e671d7013ddd26860267b960b29";
 const DROP_NOTE_SCRIPT: &str = include_str!("../../contracts/drop-note/src/drop_note.masm");
 
 #[derive(Clone, Copy)]
@@ -172,13 +173,35 @@ async fn sender_can_recover_at_recovery_block_without_oracle() -> anyhow::Result
     let tx = execute_price_drop(
         Consumer::Sender,
         RECOVERY_BLOCK,
-        0,
-        0,
-        0,
+        BTC_USD_PREFIX,
+        USD_SUFFIX,
+        BTC_TARGET,
         false,
     )
     .await?;
 
+    assert_received_amount(&tx, DROP_AMOUNT);
+    Ok(())
+}
+
+#[tokio::test]
+async fn sender_can_recover_after_recovery_block_without_oracle() -> anyhow::Result<()> {
+    let tx = execute_price_drop(
+        Consumer::Sender,
+        RECOVERY_BLOCK + 1,
+        ETH_USD_PREFIX,
+        USD_SUFFIX,
+        ETH_TARGET,
+        false,
+    )
+    .await?;
+    assert_received_amount(&tx, DROP_AMOUNT);
+    Ok(())
+}
+
+#[tokio::test]
+async fn recipient_can_claim_immediately_before_recovery() -> anyhow::Result<()> {
+    let tx = execute_price_drop(Consumer::Recipient, RECOVERY_BLOCK - 1, 0, 0, 0, false).await?;
     assert_received_amount(&tx, DROP_AMOUNT);
     Ok(())
 }
@@ -229,7 +252,9 @@ async fn execute_price_drop(
         Consumer::Sender => sender.id(),
         Consumer::Recipient => recipient.id(),
     };
-    let mut tx_builder = mock_chain.build_tx_context(consumer_id, &[drop_note.id()], &[])?;
+    let mut tx_builder = mock_chain
+        .build_transaction(consumer_id)
+        .authenticated_input_note(drop_note.id());
     if let Some(foreign_inputs) = foreign_inputs {
         tx_builder = tx_builder.foreign_accounts([foreign_inputs]);
     }
@@ -249,6 +274,7 @@ fn mock_oracle_component(
         r#"
         use miden::core::sys
 
+        @account_procedure
         pub proc get_median
             # Select a deterministic eight-decimal price from the requested pair prefix.
             dup eq.{BTC_USD_PREFIX}
@@ -307,10 +333,11 @@ fn build_drop_note(
     pair_suffix: u64,
     raw_target_price: u64,
 ) -> anyhow::Result<miden_client::note::Note> {
-    let asset: Asset = FungibleAsset::mock(DROP_AMOUNT).into();
+    let asset: Asset = FungibleAsset::mock(DROP_AMOUNT);
     let mut note_rng = RandomCoin::new(Word::from([11_u32, 12, 13, 14]));
 
     Ok(NoteBuilder::new(sender, &mut note_rng)
+        .note_type(NoteType::Private)
         .code(note_script)
         .note_storage([
             Felt::from(recovery_block),
@@ -324,9 +351,9 @@ fn build_drop_note(
 
 fn assert_received_amount(tx: &ExecutedTransaction, expected_amount: u64) {
     let received_asset = tx
-        .account_delta()
+        .account_patch()
         .vault()
-        .added_assets()
+        .updated_assets()
         .next()
         .expect("the consuming wallet should contain the note asset");
 

@@ -1,9 +1,9 @@
 import { Transaction as WalletTransaction } from "@miden-sdk/miden-wallet-adapter-base";
-import type { WalletContextState } from "@miden-sdk/miden-wallet-adapter-react/dist/useWallet.js";
+import type { WalletContextState } from "@miden-sdk/miden-wallet-adapter-react";
 import type { NoteScript } from "@miden-sdk/miden-sdk";
 
 import { expirationBlockFromDays } from "@/lib/drop/amount";
-import { bytesToBase64Url, type DropEnvelopeV1 } from "@/lib/drop/protocol";
+import { bytesToBase64Url, DROP_MIDEN_RELEASE, type DropEnvelopeV1 } from "@/lib/drop/protocol";
 import { DROP_NOTE_SOURCE } from "./drop-note-source";
 import { findMidenPricePair, type MidenPricePairId } from "./price-pairs";
 
@@ -86,6 +86,7 @@ export async function createMidenDrop(input: CreateMidenDropInput): Promise<{
     envelope: {
       version: 1,
       network: "testnet",
+      midenRelease: DROP_MIDEN_RELEASE,
       noteFile: bytesToBase64Url(noteBytes),
       noteId,
       faucetId: input.faucetId,
@@ -111,7 +112,7 @@ async function createClient() {
   return MidenClient.createTestnet({
     autoSync: false,
     noteTransportUrl: undefined,
-    storeName: "miden-drop-public-chain-v1",
+    storeName: "miden-drop-public-chain-v0.16",
   });
 }
 

@@ -2,12 +2,12 @@
 
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
-import { useWallet } from "@miden-sdk/miden-wallet-adapter-react/dist/useWallet.js";
+import { useWallet } from "@miden-sdk/miden-wallet-adapter-react";
 
 import { DropNotFoundError, fetchEncryptedDrop } from "@/lib/drop/api";
 import { formatDecimalUnits } from "@/lib/drop/amount";
 import { decryptDropEnvelope } from "@/lib/drop/crypto";
-import { parseDropFragment, type DropEnvelopeV1 } from "@/lib/drop/protocol";
+import { assertCurrentMidenRelease, IncompatibleMidenReleaseError, parseDropFragment, type DropEnvelopeV1 } from "@/lib/drop/protocol";
 import { claimMidenDrop, type ClaimProgress } from "@/lib/miden/claim-client";
 import { findMidenToken } from "@/lib/miden/config";
 import { getCurrentMidenBlock } from "@/lib/miden/drop-client";
@@ -26,7 +26,7 @@ export default function ClaimPage() {
   const [completedAsRecovery, setCompletedAsRecovery] = useState(false);
   const envelopeRef = useRef<DropEnvelopeV1 | null>(null);
   const currentBlockRef = useRef(0);
-  const { importPrivateNote, requestTransaction, waitForTransaction } = useWallet();
+  const { address, importPrivateNote, requestTransaction, waitForTransaction } = useWallet();
   const { connectWallet, connected, error: connectionError, pending } = useWalletConnection();
   const pageTitle = phase === "claimed"
     ? completedAsRecovery ? "Drop recovered" : "Drop claimed"
@@ -40,6 +40,7 @@ export default function ClaimPage() {
         window.history.replaceState(null, "", `${window.location.pathname}${window.location.search}`);
         const encrypted = await fetchEncryptedDrop(secret.locator);
         const decrypted = await decryptDropEnvelope(secret.key, encrypted.nonce, encrypted.ciphertext);
+        assertCurrentMidenRelease(decrypted);
         const token = findMidenToken(decrypted.faucetId);
         if (!token) throw new Error("This drop uses an unsupported token.");
         const pricePair = decrypted.pricePair ? findMidenPricePair(decrypted.pricePair) : undefined;
@@ -62,7 +63,10 @@ export default function ClaimPage() {
         setPhase("ready");
       } catch (loadError) {
         if (cancelled) return;
-        if (loadError instanceof DropNotFoundError) {
+        if (loadError instanceof IncompatibleMidenReleaseError) {
+          setPhase("failed");
+          setError(loadError.message);
+        } else if (loadError instanceof DropNotFoundError) {
           setPhase("missing");
           setError("This private drop was not found. Check that you opened the complete original link.");
         } else if (loadError instanceof Error && loadError.message.toLowerCase().includes("link")) {
@@ -97,7 +101,7 @@ export default function ClaimPage() {
       setPhase("claiming");
       setClaimProgress("validating");
       await claimMidenDrop(
-        { importPrivateNote, requestTransaction, waitForTransaction },
+        { address, importPrivateNote, requestTransaction, waitForTransaction },
         currentEnvelope,
         setClaimProgress,
       );
@@ -107,9 +111,11 @@ export default function ClaimPage() {
     } catch (claimError) {
       setPhase("ready");
       const message = claimError instanceof Error ? claimError.message : "";
-      if (/consum|nullifier|already/iu.test(message)) {
+      if (claimError instanceof IncompatibleMidenReleaseError) {
+        setError(claimError.message);
+      } else if (/consum|nullifier|already/iu.test(message)) {
         setError("This drop has already been claimed.");
-      } else if (/price|pragma|tracked|fresh|target/iu.test(message)) {
+      } else if (/price has not reached|not tracked|no fresh publisher/iu.test(message)) {
         setError("The current Oracle price has not reached this target yet. Try again after the market moves.");
       } else if (/expired|sender|recovery/iu.test(message)) {
         setError("The recovery window is open, but only the sender account can recover this drop.");

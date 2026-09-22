@@ -1,13 +1,14 @@
 import { Transaction as WalletTransaction } from "@miden-sdk/miden-wallet-adapter-base";
-import type { WalletContextState } from "@miden-sdk/miden-wallet-adapter-react/dist/useWallet.js";
+import type { WalletContextState } from "@miden-sdk/miden-wallet-adapter-react";
 
-import { base64UrlToBytes, type DropEnvelopeV1 } from "@/lib/drop/protocol";
+import { assertCurrentMidenRelease, base64UrlToBytes, type DropEnvelopeV1 } from "@/lib/drop/protocol";
 import { findMidenPricePair } from "./price-pairs";
 import { canonicalMidenNoteId, midenNoteIdsEqual } from "./note-id";
+import { getOracleForeignAccounts } from "./oracle";
 
 type ClaimWallet = Pick<
   WalletContextState,
-  "importPrivateNote" | "requestTransaction" | "waitForTransaction"
+  "address" | "importPrivateNote" | "requestTransaction" | "waitForTransaction"
 >;
 
 export type ClaimProgress = "validating" | "importing" | "requesting" | "confirming";
@@ -17,17 +18,23 @@ export async function claimMidenDrop(
   envelope: DropEnvelopeV1,
   onProgress?: (progress: ClaimProgress) => void,
 ) {
+  assertCurrentMidenRelease(envelope);
   if (!wallet.importPrivateNote || !wallet.requestTransaction || !wallet.waitForTransaction) {
     throw new Error("The connected wallet does not support private note imports.");
   }
 
   const noteBytes = base64UrlToBytes(envelope.noteFile);
   let importBytes: Uint8Array<ArrayBufferLike> = noteBytes;
+  let completeNoteBytes: Uint8Array<ArrayBufferLike> = noteBytes;
   try {
     onProgress?.("validating");
     const preparedNote = await prepareNoteFile(noteBytes, envelope);
     const noteId = preparedNote.noteId;
     importBytes = preparedNote.importBytes;
+    completeNoteBytes = preparedNote.completeNoteBytes;
+    const oracleTransaction = envelope.pricePair
+      ? await createOracleClaim(wallet.address, envelope, importBytes, completeNoteBytes)
+      : undefined;
     try {
       onProgress?.("importing");
       await wallet.importPrivateNote(importBytes);
@@ -40,12 +47,12 @@ export async function claimMidenDrop(
       throw new Error("This drop amount exceeds the wallet adapter limit.");
     }
 
-    const transaction = WalletTransaction.createConsumeTransaction(
+    const transaction = oracleTransaction ?? WalletTransaction.createConsumeTransaction(
       envelope.faucetId,
       canonicalMidenNoteId(noteId),
       "private",
       Number(amount),
-      noteBytes,
+      completeNoteBytes,
     );
     onProgress?.("requesting");
     const transactionId = await wallet.requestTransaction(transaction);
@@ -54,7 +61,59 @@ export async function claimMidenDrop(
     return transactionId;
   } finally {
     if (importBytes !== noteBytes) importBytes.fill(0);
+    if (completeNoteBytes !== noteBytes) completeNoteBytes.fill(0);
     noteBytes.fill(0);
+  }
+}
+
+async function createOracleClaim(
+  address: string | null,
+  envelope: DropEnvelopeV1,
+  importBytes: Uint8Array,
+  noteBytes: Uint8Array,
+) {
+  if (!address) throw new Error("Connect a Miden wallet before claiming this drop.");
+  const sdk = await import("@miden-sdk/miden-sdk/lazy");
+  const rpc = new sdk.RpcClient(new sdk.Endpoint("https://rpc.testnet.miden.io"));
+  try {
+    const header = await rpc.getBlockHeaderByNumber();
+    try {
+      // Recovery must still work when the Oracle or its publishers are unavailable.
+      if (header.blockNum() >= envelope.expirationBlock) return undefined;
+    } finally {
+      header.free();
+    }
+    const pair = findMidenPricePair(envelope.pricePair!);
+    if (!pair) throw new Error("This private drop uses an unsupported price pair.");
+    const file = sdk.NoteFile.deserialize(importBytes);
+    const note = file.note();
+    const proof = file.inclusionProof();
+    try {
+      if (!note || !proof) throw new Error("The private drop is missing its inclusion proof.");
+      const foreignAccounts = await getOracleForeignAccounts(rpc, pair, sdk);
+      const input = sdk.InputNote.authenticated(note, proof);
+      const builder = new sdk.TransactionRequestBuilder();
+      const withNote = builder.withExplicitInputNote(input);
+      const withForeign = withNote.withForeignAccounts(new sdk.ForeignAccountArray(foreignAccounts));
+      const request = withForeign.build();
+      try {
+        return WalletTransaction.createCustomTransaction(
+          address, address, request, [canonicalMidenNoteId(envelope.noteId)], [noteBytes],
+        );
+      } finally {
+        request.free();
+        withForeign.free();
+        withNote.free();
+        builder.free();
+        input.free();
+      }
+    } finally {
+      proof?.free();
+      note?.free();
+      file.free();
+    }
+  } finally {
+    rpc.free();
   }
 }
 
@@ -79,7 +138,7 @@ async function prepareNoteFile(noteBytes: Uint8Array, envelope: DropEnvelopeV1) 
         validateNoteAssets(note.assets(), envelope, sdk);
         validateNoteStorage(note, envelope);
         const importBytes = await authenticatedNoteFileBytes(note, embeddedNoteId, sdk);
-        return { noteId: embeddedNoteId, importBytes };
+        return { noteId: embeddedNoteId, importBytes, completeNoteBytes: noteBytes };
       } finally {
         noteId.free();
       }
@@ -101,7 +160,7 @@ async function prepareNoteFile(noteBytes: Uint8Array, envelope: DropEnvelopeV1) 
           }
           validateNoteAssets(completeNote.assets(), envelope, sdk);
           validateNoteStorage(completeNote, envelope);
-          return { noteId: embeddedNoteId, importBytes: noteBytes };
+          return { noteId: embeddedNoteId, importBytes: noteBytes, completeNoteBytes: completeNote.serialize() };
         } finally {
           noteId.free();
         }
@@ -162,15 +221,16 @@ async function authenticatedNoteFileBytes(
   const rpc = new sdk.RpcClient(new sdk.Endpoint("https://rpc.testnet.miden.io"));
   let fetchedNote: Awaited<ReturnType<typeof rpc.getNotesById>>[number] | undefined;
   try {
-    const parsedNoteId = sdk.NoteId.fromHex(canonicalMidenNoteId(noteId));
-    const fetchedNotes = await rpc.getNotesById([parsedNoteId]);
+    // getNotesById takes ownership of every NoteId in the array.
+    const fetchedNotes = await rpc.getNotesById([sdk.NoteId.fromHex(canonicalMidenNoteId(noteId))]);
     fetchedNote = fetchedNotes[0];
     for (const extra of fetchedNotes.slice(1)) extra.free();
     if (!fetchedNote) {
       throw new Error("This private note is not yet available on Miden Testnet. Try again shortly.");
     }
 
-    const inputNote = sdk.InputNote.authenticated(note, fetchedNote.inclusionProof);
+    const proof = fetchedNote.inclusionProof;
+    const inputNote = sdk.InputNote.authenticated(note, proof);
     try {
       const noteFile = sdk.NoteFile.fromInputNote(inputNote);
       try {
@@ -180,6 +240,7 @@ async function authenticatedNoteFileBytes(
       }
     } finally {
       inputNote.free();
+      proof.free();
     }
   } finally {
     fetchedNote?.free();

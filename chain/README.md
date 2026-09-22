@@ -38,15 +38,15 @@ intended recipient.
 
 ## Requirements
 
-- Rust toolchain from `rust-toolchain.toml`.
-- Miden-compatible dependencies resolved by Cargo.
+- Rust **1.98.1**, pinned in `rust-toolchain.toml` (run Cargo from this directory).
+- Miden client, standards and testing **0.16.1**, with the committed `Cargo.lock`.
 
 ## Test
 
 From `chain/`:
 
 ```sh
-cargo test -p integration --release
+cargo test -p integration --release --locked
 ```
 
 Run only the drop-note integration suite:
@@ -56,8 +56,20 @@ cargo test -p integration --test drop_note_test --release
 ```
 
 The integration suite compiles the MASM with Miden's `CodeBuilder` and uses a deterministic public
-mock Oracle through the same FPI interface as Pragma. It covers the no-Oracle path, both supported
+mock Oracle through the same FPI interface as Pragma. Notes are private, matching the frontend.
+It covers the no-Oracle path, both supported
 pairs, equality and below-target comparisons, partial-condition rejection, the pair allowlist, early
 sender lockout, and both sides of the recovery boundary.
+
+Verify the deployed testnet token metadata and pinned Pragma procedure without signing or sending
+a transaction:
+
+```sh
+cargo run -p integration --example verify_testnet --release --locked
+```
+
+The v0.16 implementation uses MASM `as` aliases, `account_id::eq`, and
+`basic_wallet::move_note_assets_to_account`. Tests use `build_transaction`, authenticated input
+notes and `account_patch().vault().updated_assets()`.
 
 Frontend creation, private-note transport, and live-node submission remain outside this folder.
