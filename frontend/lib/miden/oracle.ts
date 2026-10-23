@@ -2,8 +2,8 @@ import type { ForeignAccount, RpcClient } from "@miden-sdk/miden-sdk";
 
 import type { MidenPricePair } from "./price-pairs";
 
-export const PRAGMA_ORACLE_ID = "0x3b306d819a19b691205480e1619b5c";
-export const PRAGMA_GET_MEDIAN_ROOT = "0xab62a61417fb6c1edc191d24b6a3cc53b2071e671d7013ddd26860267b960b29";
+export const PRAGMA_ORACLE_ID = "0x8f8d747477ca171144feadc60a1137";
+export const PRAGMA_GET_MEDIAN_ROOT = "0x633ac6865a1c4c27f065c07439d59bffdcd931ed9a706abbe2ae70dcd76031ac";
 const PUBLISHERS_SLOT = "pragma::oracle::publishers";
 
 // Declare public accounts, so the wallet fetches witnesses at its own execution
@@ -23,9 +23,10 @@ export async function getOracleForeignAccounts(
     const oracleId = keep(sdk.AccountId.fromHex(PRAGMA_ORACLE_ID));
     const fetched = keep(await rpc.getAccountDetails(oracleId));
     const oracle = fetched.account();
-    if (!oracle) throw new Error("The Pragma Oracle is unavailable on Miden Testnet.");
+    if (!oracle) throw new Error("The Pragma Oracle is unavailable on Miden Mainnet (Cedar).");
     keep(oracle);
-    if (!keep(oracle.code()).hasProcedure(keep(sdk.Word.fromHex(PRAGMA_GET_MEDIAN_ROOT)))) {
+    // hasProcedure takes ownership of the Word; it must not enter our cleanup list.
+    if (!keep(oracle.code()).hasProcedure(sdk.Word.fromHex(PRAGMA_GET_MEDIAN_ROOT))) {
       throw new Error("The Pragma Oracle deployment has changed. Please update Miden Drop.");
     }
     const storage = keep(oracle.storage());
@@ -48,7 +49,7 @@ export async function getOracleForeignAccounts(
       const publisher = keep(sdk.AccountId.fromPrefixSuffix(keep(new sdk.Felt(prefix)), keep(new sdk.Felt(suffix))));
       if (seen.has(publisher.toString())) continue;
       seen.add(publisher.toString());
-      const pairKey = new sdk.Word(BigUint64Array.from([BigInt(pair.pairPrefix), BigInt(pair.pairSuffix), BigInt(0), BigInt(0)]));
+      const pairKey = sdk.Word.fromHex(pair.oracleKey);
       const publisherSlot = new sdk.SlotAndKeys("pragma::publisher::entries", [pairKey]);
       const requirements = sdk.AccountStorageRequirements.fromSlotAndKeysArray([publisherSlot]);
       foreignAccounts.push(sdk.ForeignAccount.public(publisher, requirements));

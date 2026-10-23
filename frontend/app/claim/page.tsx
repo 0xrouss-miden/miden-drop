@@ -141,7 +141,7 @@ export default function ClaimPage() {
           </section>
         ) : phase === "claimed" ? (
           <section className="claim-surface clipped-surface">
-            <div className="success-state" role="status"><span><Icon name="check" /></span><div><strong>{completedAsRecovery ? "Funds recovered" : "Funds received"}</strong><p>The private note was consumed by your wallet on Miden Testnet.</p></div></div>
+            <div className="success-state" role="status"><span><Icon name="check" /></span><div><strong>{completedAsRecovery ? "Funds recovered" : "Funds received"}</strong><p>The private note was consumed by your wallet on Miden Mainnet (Cedar).</p></div></div>
             <Link className="primary-button claim-complete-action" href="/">Return home <Icon name="arrow" /></Link>
           </section>
         ) : details ? (
@@ -153,7 +153,7 @@ export default function ClaimPage() {
             <dl className="detail-list">
               <div><dt>From</dt><dd>Private sender</dd></div>
               <div><dt>Claim condition</dt><dd>{details.pricePair ? `${details.pricePair} ≥ ${details.targetPrice}` : "Bearer link · no Oracle"}</dd></div>
-              <div><dt>Network</dt><dd><span className="status-dot" />Miden Testnet</dd></div>
+              <div><dt>Network</dt><dd><span className="status-dot" />Miden Mainnet (Cedar)</dd></div>
               <div><dt>Sender recovery</dt><dd>{details.expired ? "Open now" : `Block ${details.expirationBlock.toLocaleString()}`}</dd></div>
               <div><dt>Message</dt><dd>{details.message || "No message"}</dd></div>
             </dl>
@@ -179,6 +179,6 @@ export default function ClaimPage() {
 function claimProgressLabel(progress: ClaimProgress, recovering: boolean) {
   if (progress === "importing") return "Approve note import in wallet…";
   if (progress === "requesting") return recovering ? "Approve recovery in wallet…" : "Approve claim in wallet…";
-  if (progress === "confirming") return "Waiting for Testnet confirmation…";
+  if (progress === "confirming") return "Waiting for mainnet confirmation…";
   return "Validating private note…";
 }

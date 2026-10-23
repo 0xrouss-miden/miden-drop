@@ -1,9 +1,10 @@
 import { isMidenPricePairId, type MidenPricePairId } from "@/lib/miden/price-pairs";
+import { MIDEN_NETWORK, MIDEN_RELEASE } from "@/lib/miden/network";
 
 export const DROP_PROTOCOL_VERSION = 1 as const;
-export const DROP_NETWORK = "testnet" as const;
-export const DROP_AAD = "miden-drop:v1:testnet";
-export const DROP_MIDEN_RELEASE = "0.16" as const;
+export const DROP_NETWORK = MIDEN_NETWORK;
+export const DROP_AAD = "miden-drop:v1:mainnet:cedar";
+export const DROP_MIDEN_RELEASE = MIDEN_RELEASE;
 
 export type DropEnvelopeV1 = {
   version: typeof DROP_PROTOCOL_VERSION;
@@ -22,13 +23,15 @@ export type DropEnvelopeV1 = {
 
 export class IncompatibleMidenReleaseError extends Error {
   constructor() {
-    super("This drop was created for an older Miden testnet. Ask the sender to create a new drop for Miden 0.16.");
+    super("This drop belongs to another Miden network or release. Ask the sender to create a new drop on Miden Mainnet (Cedar), version 0.17.");
     this.name = "IncompatibleMidenReleaseError";
   }
 }
 
 export function assertCurrentMidenRelease(envelope: DropEnvelopeV1) {
-  if (envelope.midenRelease !== DROP_MIDEN_RELEASE) throw new IncompatibleMidenReleaseError();
+  if (envelope.network !== DROP_NETWORK || envelope.midenRelease !== DROP_MIDEN_RELEASE) {
+    throw new IncompatibleMidenReleaseError();
+  }
 }
 
 export type EncryptedDrop = {

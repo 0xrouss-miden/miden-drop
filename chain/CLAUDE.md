@@ -22,7 +22,7 @@ plumbing unless a new product requirement explicitly needs them.
 - At and after recovery, only `active_note::get_sender()` may consume, without Pragma inputs.
 - All note assets are transferred via
   `miden::standards::wallets::basic::move_note_assets_to_account`.
-- Expiration uses the transaction reference block returned by `tx::get_block_number()`.
+- Expiration uses the transaction reference block returned by `tx::get_reference_block_number()`.
 - The expiration boundary is inclusive.
 - Reclaim is never automatic; the sender must consume the note.
 
@@ -46,7 +46,9 @@ Every behavior change must cover, where applicable:
 4. Sender reclaim at or after expiration.
 5. Asset transfer through `account_patch().vault().updated_assets()`.
 
-Keep the browser MASM copy and deployment pins synchronized. Use Rust 1.98.1 and Miden 0.16.1.
+Keep the browser MASM copy and deployment pins synchronized. Use Rust 1.98.1, Miden client 0.17.5 and protocol/standards/testing 0.17.1.
+Cedar Oracle v1 takes pair-name hashes and returns publisher count, price, decimals and timestamp.
+Require at least one publisher, eight decimals and a timestamp within 120 seconds of the reference block.
 
 ## Relevant Claude skills
 

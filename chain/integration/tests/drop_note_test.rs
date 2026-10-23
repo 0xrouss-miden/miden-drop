@@ -5,13 +5,13 @@ use miden_client::{
     assembly::{CodeBuilder, DefaultSourceManager},
     asset::{Asset, FungibleAsset},
     auth::AuthSchemeId,
-    crypto::RandomCoin,
     note::NoteType,
     transaction::{ExecutedTransaction, RawOutputNote},
-    Felt, Word,
+    Felt,
 };
 use miden_standards::testing::note::NoteBuilder;
 use miden_testing::{Auth, MockChain};
+use rand::{rngs::StdRng, SeedableRng};
 
 const DROP_AMOUNT: u64 = 250;
 const RECOVERY_BLOCK: u32 = 5;
@@ -23,11 +23,11 @@ const ETH_PRICE: u64 = 210_000_000_000;
 const BTC_TARGET: u64 = 6_500_000_000_000;
 const ETH_TARGET: u64 = 200_000_000_000;
 
-const PRAGMA_ORACLE_ID: &str = "0x3b306d819a19b691205480e1619b5c";
-const PRAGMA_ORACLE_PREFIX: &str = "4265029250523444881";
-const PRAGMA_ORACLE_SUFFIX: &str = "2329628612750957568";
+const PRAGMA_ORACLE_ID: &str = "0x8f8d747477ca171144feadc60a1137";
+const PRAGMA_ORACLE_PREFIX: &str = "10344051962714658577";
+const PRAGMA_ORACLE_SUFFIX: &str = "4971602104747636480";
 const PRAGMA_GET_MEDIAN_ROOT: &str =
-    "0xab62a61417fb6c1edc191d24b6a3cc53b2071e671d7013ddd26860267b960b29";
+    "0x633ac6865a1c4c27f065c07439d59bffdcd931ed9a706abbe2ae70dcd76031ac";
 const DROP_NOTE_SCRIPT: &str = include_str!("../../contracts/drop-note/src/drop_note.masm");
 
 #[derive(Clone, Copy)]
@@ -206,6 +206,56 @@ async fn recipient_can_claim_immediately_before_recovery() -> anyhow::Result<()>
     Ok(())
 }
 
+#[tokio::test]
+async fn oracle_v1_rejects_unavailable_misscaled_or_stale_prices() {
+    let now = u64::from(MockChain::TIMESTAMP_START_SECS);
+    for (reply, expected_error) in [
+        ([0, BTC_PRICE, 8, now], "no fresh publisher value"),
+        ([1, BTC_PRICE, 6, now], "decimals do not match"),
+        ([1, 0, 8, now], "price has not reached"),
+        ([1, BTC_PRICE, 8, 0], "freshness window"),
+        ([1, BTC_PRICE, 8, now - 121], "freshness window"),
+        ([1, BTC_PRICE, 8, now + 1], "freshness window"),
+    ] {
+        let error = execute_price_drop_with_reply(
+            Consumer::Recipient,
+            0,
+            BTC_USD_PREFIX,
+            USD_SUFFIX,
+            BTC_TARGET,
+            true,
+            Some(reply),
+        )
+        .await
+        .expect_err("invalid Oracle v1 data authorized a claim");
+        assert!(
+            error.to_string().contains(expected_error),
+            "{reply:?}: {error}"
+        );
+    }
+}
+
+#[tokio::test]
+async fn oracle_v1_accepts_multiple_publishers_and_the_freshness_boundary() -> anyhow::Result<()> {
+    let tx = execute_price_drop_with_reply(
+        Consumer::Recipient,
+        0,
+        BTC_USD_PREFIX,
+        USD_SUFFIX,
+        BTC_TARGET,
+        true,
+        Some([
+            2,
+            BTC_PRICE,
+            8,
+            u64::from(MockChain::TIMESTAMP_START_SECS) - 120,
+        ]),
+    )
+    .await?;
+    assert_received_amount(&tx, DROP_AMOUNT);
+    Ok(())
+}
+
 async fn execute_price_drop(
     consumer: Consumer,
     current_block: u32,
@@ -214,12 +264,33 @@ async fn execute_price_drop(
     raw_target_price: u64,
     include_oracle_inputs: bool,
 ) -> anyhow::Result<ExecutedTransaction> {
+    execute_price_drop_with_reply(
+        consumer,
+        current_block,
+        pair_prefix,
+        pair_suffix,
+        raw_target_price,
+        include_oracle_inputs,
+        None,
+    )
+    .await
+}
+
+async fn execute_price_drop_with_reply(
+    consumer: Consumer,
+    current_block: u32,
+    pair_prefix: u64,
+    pair_suffix: u64,
+    raw_target_price: u64,
+    include_oracle_inputs: bool,
+    reply: Option<[u64; 4]>,
+) -> anyhow::Result<ExecutedTransaction> {
     let mut builder = MockChain::builder();
     let sender = builder.add_existing_wallet(basic_auth())?;
     let recipient = builder.add_existing_wallet(basic_auth())?;
 
     let source_manager = Arc::new(DefaultSourceManager::default());
-    let oracle_component = mock_oracle_component(source_manager.clone())?;
+    let oracle_component = mock_oracle_component(source_manager.clone(), reply)?;
     let get_median_root = oracle_component
         .component_code()
         .procedure_roots()
@@ -269,23 +340,36 @@ async fn execute_price_drop(
 
 fn mock_oracle_component(
     source_manager: Arc<DefaultSourceManager>,
+    reply: Option<[u64; 4]>,
 ) -> anyhow::Result<AccountComponent> {
-    let source = format!(
-        r#"
+    let source = if let Some([count, price, decimals, timestamp]) = reply {
+        format!(
+            r#"
+        use miden::core::sys
+        @account_procedure
+        pub proc get_median
+            dropw dropw dropw dropw
+            padw padw padw push.{timestamp}.{decimals}.{price}.{count}
+            exec.sys::truncate_stack
+        end
+        "#
+        )
+    } else {
+        format!(
+            r#"
         use miden::core::sys
 
         @account_procedure
         pub proc get_median
-            # Select a deterministic eight-decimal price from the requested pair prefix.
-            dup eq.{BTC_USD_PREFIX}
+            push.0xd189b4e9c38c367ba926ddb0044b781ca8fff18dcc10a0c75ff5600a1eb4d0eb eqw movdn.4 dropw
             if.true
                 dropw dropw dropw dropw
-                padw padw padw push.0.0.{BTC_PRICE}.1
+                padw padw padw push.{timestamp}.8.{BTC_PRICE}.1
             else
-                dup eq.{ETH_USD_PREFIX}
+                push.0x9a50f4137c634e0b384a87bea3a186e578e21274af6ae752230ead4631233e1d eqw movdn.4 dropw
                 if.true
                     dropw dropw dropw dropw
-                    padw padw padw push.0.0.{ETH_PRICE}.1
+                    padw padw padw push.{timestamp}.8.{ETH_PRICE}.1
                 else
                     dropw dropw dropw dropw
                     padw padw padw push.0.0.0.0
@@ -295,7 +379,9 @@ fn mock_oracle_component(
             exec.sys::truncate_stack
         end
         "#,
-    );
+            timestamp = MockChain::TIMESTAMP_START_SECS,
+        )
+    };
     let code = CodeBuilder::with_source_manager(source_manager)
         .compile_component_code("test::price_oracle", &source)?;
 
@@ -334,7 +420,7 @@ fn build_drop_note(
     raw_target_price: u64,
 ) -> anyhow::Result<miden_client::note::Note> {
     let asset: Asset = FungibleAsset::mock(DROP_AMOUNT);
-    let mut note_rng = RandomCoin::new(Word::from([11_u32, 12, 13, 14]));
+    let mut note_rng = StdRng::from_seed([11; 32]);
 
     Ok(NoteBuilder::new(sender, &mut note_rng)
         .note_type(NoteType::Private)
@@ -357,8 +443,6 @@ fn assert_received_amount(tx: &ExecutedTransaction, expected_amount: u64) {
         .next()
         .expect("the consuming wallet should contain the note asset");
 
-    let Asset::Fungible(received_asset) = received_asset else {
-        panic!("the received asset should be fungible");
-    };
+    let received_asset = received_asset.unwrap_fungible();
     assert_eq!(received_asset.amount().as_u64(), expected_amount);
 }

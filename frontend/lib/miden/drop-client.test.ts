@@ -13,7 +13,7 @@ vi.mock("@miden-sdk/miden-sdk/lazy", async (importOriginal) => {
     ...real,
     MidenClient: {
       ready: async () => {},
-      createTestnet: async () => ({
+      create: async () => ({
         syncChain: async () => {},
         getSyncHeight: async () => 100,
         compile: { noteScript: async () => real.NoteScript.p2id() },
@@ -54,7 +54,8 @@ describe("drop creation wallet requests", () => {
         faucetId: "0x18101fa522c174b165efd4f70a0385",
       });
       expect(result.transactionId).toBe("tx-created");
-      expect(result.envelope.midenRelease).toBe("0.16");
+      expect(result.envelope.midenRelease).toBe("0.17");
+      expect(result.envelope.network).toBe("mainnet");
       expect(result.envelope.expirationBlock).toBe(28900);
       expect(outputNotes).toHaveLength(1);
       const id = outputNotes[0].id();

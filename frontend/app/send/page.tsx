@@ -319,6 +319,6 @@ function toCreationError(error: unknown, noteWasCreated: boolean, tokenSymbol: s
   const message = error instanceof Error ? error.message : "";
   if (/reject|denied|cancel/iu.test(message)) return "The wallet request was cancelled. Your funds have not moved.";
   if (/insufficient|balance/iu.test(message)) return `Your wallet does not have enough ${tokenSymbol} for this drop.`;
-  if (/network|fetch|rpc|offline|timeout/iu.test(message)) return "Miden Testnet could not be reached. Check your connection and try again.";
+  if (/network|fetch|rpc|offline|timeout/iu.test(message)) return "Miden Mainnet (Cedar) could not be reached. Check your connection and try again.";
   return message || "The wallet could not create this drop. Your funds have not moved.";
 }

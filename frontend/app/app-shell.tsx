@@ -18,7 +18,7 @@ export default function AppShell({ children }: { children: ReactNode }) {
         <nav className="main-nav" aria-label="Main navigation">
           <Link className={pathname === "/send" ? "is-active" : ""} href="/send">Send</Link>
           <Link className={pathname === "/receive" ? "is-active" : ""} href="/receive">Receive</Link>
-          <span className="network-label"><span />Miden Testnet</span>
+          <span className="network-label"><span />Mainnet · Cedar</span>
         </nav>
         {connected ? (
           <div className="wallet-control">
@@ -42,7 +42,7 @@ export default function AppShell({ children }: { children: ReactNode }) {
       <footer className={`site-footer${isLanding ? "" : " site-footer--compact"}`}>
         <Link className="brand" href="/"><BrandMark /><span>Miden Drop</span></Link>
         <p>Private, programmable money you can send as a link.</p>
-        <span className="network-label"><span />Miden Testnet</span>
+        <span className="network-label"><span />Mainnet · Cedar</span>
       </footer>
     </div>
   );

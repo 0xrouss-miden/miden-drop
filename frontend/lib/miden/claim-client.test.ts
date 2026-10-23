@@ -132,8 +132,8 @@ const requestGuardianInfo = vi.fn().mockResolvedValue({ isGuardianAccount: false
 function envelope(bytes: Uint8Array): DropEnvelopeV1 {
   return {
     version: 1,
-    network: "testnet",
-    midenRelease: "0.16",
+    network: "mainnet",
+    midenRelease: "0.17",
     noteFile: bytesToBase64Url(bytes),
     noteId: NOTE_ID,
     faucetId: FAUCET_ID,
@@ -254,7 +254,11 @@ describe("claimMidenDrop note payloads", () => {
     expect(wallet.requestTransaction.mock.calls[0][0].payload.importNotes).toEqual(["AQcJ"]);
   });
 
-  it("rejects links from the previous testnet before requesting wallet actions", async () => {
+  it.each([
+    { network: "testnet", midenRelease: "0.17" },
+    { network: "mainnet", midenRelease: "0.16" },
+    { network: "mainnet", midenRelease: undefined },
+  ])("rejects incompatible links %j before requesting wallet actions", async (identity) => {
     const wallet = {
       address: "mtst1wallet",
       requestGuardianInfo,
@@ -262,9 +266,8 @@ describe("claimMidenDrop note payloads", () => {
       requestTransaction: vi.fn(),
       waitForTransaction: vi.fn(),
     };
-    const legacy = envelope(new Uint8Array([1, 7, 9]));
-    delete legacy.midenRelease;
-    await expect(claimMidenDrop(wallet, legacy)).rejects.toThrow("older Miden testnet");
+    const legacy = { ...envelope(new Uint8Array([1, 7, 9])), ...identity } as DropEnvelopeV1;
+    await expect(claimMidenDrop(wallet, legacy)).rejects.toThrow("another Miden network or release");
     expect(wallet.importPrivateNote).not.toHaveBeenCalled();
     expect(wallet.requestTransaction).not.toHaveBeenCalled();
   });

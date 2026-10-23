@@ -6,6 +6,7 @@ import { findMidenPricePair } from "./price-pairs";
 import { canonicalMidenNoteId, midenNoteIdsEqual } from "./note-id";
 import { getOracleForeignAccounts } from "./oracle";
 import { createWalletTransactionBuilder } from "./wallet-transaction";
+import { MIDEN_RPC_URL } from "./network";
 
 type ClaimWallet = Pick<
   WalletContextState,
@@ -76,7 +77,7 @@ async function createOracleClaim(
   const { address } = wallet;
   if (!address) throw new Error("Connect a Miden wallet before claiming this drop.");
   const sdk = await import("@miden-sdk/miden-sdk/lazy");
-  const rpc = new sdk.RpcClient(new sdk.Endpoint("https://rpc.testnet.miden.io"));
+  const rpc = new sdk.RpcClient(new sdk.Endpoint(MIDEN_RPC_URL));
   try {
     const header = await rpc.getBlockHeaderByNumber();
     try {
@@ -220,7 +221,7 @@ async function authenticatedNoteFileBytes(
   noteId: string,
   sdk: typeof import("@miden-sdk/miden-sdk/lazy"),
 ) {
-  const rpc = new sdk.RpcClient(new sdk.Endpoint("https://rpc.testnet.miden.io"));
+  const rpc = new sdk.RpcClient(new sdk.Endpoint(MIDEN_RPC_URL));
   let fetchedNote: Awaited<ReturnType<typeof rpc.getNotesById>>[number] | undefined;
   try {
     // getNotesById takes ownership of every NoteId in the array.
@@ -228,7 +229,7 @@ async function authenticatedNoteFileBytes(
     fetchedNote = fetchedNotes[0];
     for (const extra of fetchedNotes.slice(1)) extra.free();
     if (!fetchedNote) {
-      throw new Error("This private note is not yet available on Miden Testnet. Try again shortly.");
+      throw new Error("This private note is not yet available on Miden Mainnet (Cedar). Try again shortly.");
     }
 
     const proof = fetchedNote.inclusionProof;

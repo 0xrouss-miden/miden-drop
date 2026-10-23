@@ -7,6 +7,8 @@ import {
   type DropEnvelopeV1,
   type EncryptedDrop,
   isDropEnvelope,
+  assertCurrentMidenRelease,
+  IncompatibleMidenReleaseError,
 } from "./protocol";
 
 const textEncoder = new TextEncoder();
@@ -14,6 +16,7 @@ const textDecoder = new TextDecoder("utf-8", { fatal: true });
 
 export async function encryptDropEnvelope(envelope: DropEnvelopeV1): Promise<EncryptedDrop> {
   if (!isDropEnvelope(envelope)) throw new Error("Invalid drop envelope.");
+  assertCurrentMidenRelease(envelope);
 
   const locatorBytes = crypto.getRandomValues(new Uint8Array(16));
   const keyBytes = crypto.getRandomValues(new Uint8Array(32));
@@ -56,12 +59,26 @@ export async function decryptDropEnvelope(
 
   const key = await crypto.subtle.importKey("raw", keyBytes, "AES-GCM", false, ["decrypt"]);
   keyBytes.fill(0);
-  const plaintext = await crypto.subtle.decrypt({
+  const decrypt = (aad: string) => crypto.subtle.decrypt({
     name: "AES-GCM",
     iv: nonce,
-    additionalData: textEncoder.encode(DROP_AAD),
+    additionalData: textEncoder.encode(aad),
     tagLength: 128,
   }, key, ciphertext);
+  let plaintext: ArrayBuffer;
+  try {
+    plaintext = await decrypt(DROP_AAD);
+  } catch (error) {
+    // Authenticate legacy links only to explain their incompatibility. Never
+    // deserialize their notes or offer them to a mainnet wallet.
+    try {
+      const legacy = new Uint8Array(await decrypt("miden-drop:v1:testnet"));
+      legacy.fill(0);
+    } catch {
+      throw error;
+    }
+    throw new IncompatibleMidenReleaseError();
+  }
 
   const plaintextBytes = new Uint8Array(plaintext);
   try {
@@ -69,6 +86,7 @@ export async function decryptDropEnvelope(
     if (!isDropEnvelope(parsed) || parsed.network !== DROP_NETWORK) {
       throw new Error("Unsupported drop envelope.");
     }
+    assertCurrentMidenRelease(parsed);
     return parsed;
   } finally {
     plaintextBytes.fill(0);

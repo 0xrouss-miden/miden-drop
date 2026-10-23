@@ -3,10 +3,11 @@ import type { WalletContextState } from "@miden-sdk/miden-wallet-adapter-react";
 import type { NoteScript } from "@miden-sdk/miden-sdk";
 
 import { expirationBlockFromDays } from "@/lib/drop/amount";
-import { bytesToBase64Url, DROP_MIDEN_RELEASE, type DropEnvelopeV1 } from "@/lib/drop/protocol";
+import { bytesToBase64Url, DROP_NETWORK, DROP_MIDEN_RELEASE, type DropEnvelopeV1 } from "@/lib/drop/protocol";
 import { DROP_NOTE_SOURCE } from "./drop-note-source";
 import { findMidenPricePair, type MidenPricePairId } from "./price-pairs";
 import { createWalletTransactionBuilder } from "./wallet-transaction";
+import { MIDEN_RPC_URL, MIDEN_STORE_NAME } from "./network";
 
 const DROP_NOTE_TAG = 0x4d44524f;
 let clientPromise: Promise<Awaited<ReturnType<typeof createClient>>> | undefined;
@@ -89,7 +90,7 @@ export async function createMidenDrop(input: CreateMidenDropInput): Promise<{
     transactionId,
     envelope: {
       version: 1,
-      network: "testnet",
+      network: DROP_NETWORK,
       midenRelease: DROP_MIDEN_RELEASE,
       noteFile: bytesToBase64Url(noteBytes),
       noteId,
@@ -113,10 +114,11 @@ export async function getCurrentMidenBlock() {
 
 async function createClient() {
   const { MidenClient } = await import("@miden-sdk/miden-sdk/lazy");
-  return MidenClient.createTestnet({
+  return MidenClient.create({
+    rpcUrl: MIDEN_RPC_URL,
     autoSync: false,
     noteTransportUrl: undefined,
-    storeName: "miden-drop-public-chain-v0.16",
+    storeName: MIDEN_STORE_NAME,
   });
 }
 

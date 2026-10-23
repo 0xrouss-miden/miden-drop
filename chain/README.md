@@ -27,7 +27,9 @@ chain/
 
 Before the recovery block, the sender account cannot consume the note. Another bearer may consume it
 immediately when the Oracle fields are zero, or only after Pragma returns a fresh, tracked median at
-or above the configured target when price gating is enabled. At and after the recovery block, the
+or above the configured target when price gating is enabled. Oracle v1 pair selectors are mapped to the
+Poseidon2 hashes of `BTC/USD` and `ETH/USD`. The result must have at least one publisher, eight
+decimals, and a non-zero timestamp no older than 120 seconds relative to the reference block. At and after the recovery block, the
 Oracle is skipped and only the original sender may recover the assets.
 
 Recovery is expressed as a block height and is not automatic. The sender must submit a transaction
@@ -39,7 +41,8 @@ intended recipient.
 ## Requirements
 
 - Rust **1.98.1**, pinned in `rust-toolchain.toml` (run Cargo from this directory).
-- Miden client, standards and testing **0.16.1**, with the committed `Cargo.lock`.
+- Miden client **0.17.5** and protocol, standards and testing **0.17.1**, with the committed `Cargo.lock`.
+- Protocol 0.18 is not compatible with this stable SDK release; keep the 0.17 dependency family together.
 
 ## Test
 
@@ -59,17 +62,18 @@ The integration suite compiles the MASM with Miden's `CodeBuilder` and uses a de
 mock Oracle through the same FPI interface as Pragma. Notes are private, matching the frontend.
 It covers the no-Oracle path, both supported
 pairs, equality and below-target comparisons, partial-condition rejection, the pair allowlist, early
-sender lockout, and both sides of the recovery boundary.
+sender lockout, and both sides of the recovery boundary. Oracle v1 cases reject zero publishers, zero prices, incorrect decimals,
+missing timestamps, stale values and future timestamps, and accept multiple publishers and the 120-second boundary.
 
-Verify the deployed testnet token metadata and pinned Pragma procedure without signing or sending
+Verify the deployed Cedar token metadata and pinned Pragma procedure without signing or sending
 a transaction:
 
 ```sh
-cargo run -p integration --example verify_testnet --release --locked
+cargo run -p integration --example verify_cedar --release --locked
 ```
 
-The v0.16 implementation uses MASM `as` aliases, `account_id::eq`, and
-`basic_wallet::move_note_assets_to_account`. Tests use `build_transaction`, authenticated input
+The v0.17 implementation uses MASM `as` aliases, `account_id::eq`, and
+`basic_wallet::move_note_assets_to_account`. Recovery reads `tx::get_reference_block_number()`. Tests use `build_transaction`, authenticated input
 notes and `account_patch().vault().updated_assets()`.
 
 Frontend creation, private-note transport, and live-node submission remain outside this folder.

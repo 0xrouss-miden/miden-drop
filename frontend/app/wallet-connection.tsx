@@ -4,9 +4,9 @@ import { useEffect, useState } from "react";
 import {
   AllowedPrivateData,
   PrivateDataPermission,
-  WalletAdapterNetwork,
 } from "@miden-sdk/miden-wallet-adapter-base";
 import { useWallet } from "@miden-sdk/miden-wallet-adapter-react";
+import { MIDEN_WALLET_NETWORK } from "@/lib/miden/network";
 
 function shortAddress(address?: string | null) {
   if (!address) return "Connected";
@@ -33,7 +33,7 @@ export function useWalletConnection() {
 
     void connect(
       PrivateDataPermission.Auto,
-      WalletAdapterNetwork.Testnet,
+      MIDEN_WALLET_NETWORK,
       AllowedPrivateData.Assets,
     )
       .catch((connectionError: unknown) => {
@@ -57,7 +57,7 @@ export function useWalletConnection() {
 
       await connect(
         PrivateDataPermission.Auto,
-        WalletAdapterNetwork.Testnet,
+        MIDEN_WALLET_NETWORK,
         AllowedPrivateData.Assets,
       );
     } catch (connectionError) {

@@ -9,7 +9,7 @@ const PUBLISHER = "0x22a42798e8519c914214f1a63009c8";
 const SECOND_PUBLISHER = "0x0b372f2735e33e91216d995bf29b91";
 
 beforeAll(() => {
-  // v0.16.2 exports initSync at runtime but omits it from the public type barrel.
+  // v0.17.6 exports initSync at runtime but omits it from the public type barrel.
   const { initSync } = sdk as typeof sdk & { initSync(input: { module: Buffer }): unknown };
   initSync({ module: readFileSync("node_modules/@miden-sdk/miden-sdk/dist/st/assets/miden_client_web.wasm") });
 });
@@ -40,11 +40,11 @@ function rpcWithPublishers(publishers: (string | null)[], hasProcedure = true) {
   } as unknown as sdk.RpcClient;
 }
 
-describe("Pragma foreign accounts with the v0.16 WASM SDK", () => {
+describe("Pragma foreign accounts with the v0.17 WASM SDK", () => {
   it("serializes the Oracle and multiple publishers without reusing consumed WASM objects", async () => {
     const accounts = await getOracleForeignAccounts(rpcWithPublishers([PUBLISHER, SECOND_PUBLISHER]), MIDEN_PRICE_PAIRS[0], sdk);
     expect(accounts.map((account) => {
-      const id = account.account_id();
+      const id = account.accountId();
       try { return id.toString(); } finally { id.free(); }
     })).toEqual([PUBLISHER, SECOND_PUBLISHER, PRAGMA_ORACLE_ID]);
     // ForeignAccountArray takes ownership of its entries; the builder takes ownership of the array.
@@ -71,6 +71,23 @@ describe("Pragma foreign accounts with the v0.16 WASM SDK", () => {
 
   it("rejects an Oracle whose pinned procedure is no longer deployed", async () => {
     await expect(getOracleForeignAccounts(rpcWithPublishers([PUBLISHER], false), MIDEN_PRICE_PAIRS[0], sdk)).rejects.toThrow("deployment has changed");
+  });
+
+  it("preserves deployment errors when real SDK code consumes the procedure hash", async () => {
+    const built = new sdk.AccountBuilder(new Uint8Array(32).fill(3))
+      .accountType(sdk.AccountType.Public)
+      .withNoAuthComponent()
+      .withBasicWalletComponent()
+      .build();
+    try {
+      const rpc = {
+        getAccountDetails: async () => ({ free() {}, account: () => built.account }),
+      } as unknown as sdk.RpcClient;
+      await expect(getOracleForeignAccounts(rpc, MIDEN_PRICE_PAIRS[0], sdk))
+        .rejects.toThrow("deployment has changed");
+    } finally {
+      built.free();
+    }
   });
 
   it("rejects a registry with no live publishers", async () => {

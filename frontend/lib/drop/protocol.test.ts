@@ -23,7 +23,7 @@ describe("drop link protocol", () => {
   it("accepts an optional complete price condition", () => {
     const plainEnvelope = {
       version: 1,
-      network: "testnet",
+      network: "mainnet",
       noteFile: "note",
       noteId: "note-id",
       faucetId: "faucet-id",

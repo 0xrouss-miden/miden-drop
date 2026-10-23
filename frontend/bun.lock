@@ -5,11 +5,11 @@
     "": {
       "name": "frontend",
       "dependencies": {
-        "@miden-sdk/miden-sdk": "0.16.2",
-        "@miden-sdk/miden-wallet-adapter-base": "0.16.2",
-        "@miden-sdk/miden-wallet-adapter-miden": "0.16.2",
-        "@miden-sdk/miden-wallet-adapter-react": "0.16.2",
-        "@miden-sdk/react": "0.16.2",
+        "@miden-sdk/miden-sdk": "0.17.6",
+        "@miden-sdk/miden-wallet-adapter-base": "0.17.6",
+        "@miden-sdk/miden-wallet-adapter-miden": "0.17.6",
+        "@miden-sdk/miden-wallet-adapter-react": "0.17.6",
+        "@miden-sdk/react": "0.17.6",
         "drizzle-orm": "^0.45.2",
         "next": "16.3.0",
         "postgres": "^3.4.9",
@@ -233,21 +233,23 @@
 
     "@jridgewell/trace-mapping": ["@jridgewell/trace-mapping@0.3.31", "", { "dependencies": { "@jridgewell/resolve-uri": "^3.1.0", "@jridgewell/sourcemap-codec": "^1.4.14" } }, "sha512-zzNR+SdQSDJzc8joaeP8QQoCQr8NuYx2dIIytl1QeBEZHJ9uW6hebsrYgbz8hJwUQao3TWCMtmfV8Nu1twOLAw=="],
 
-    "@miden-sdk/miden-sdk": ["@miden-sdk/miden-sdk@0.16.2", "", { "dependencies": { "dexie": "^4.0.1", "glob": "^11.0.0" }, "optionalDependencies": { "@miden-sdk/node-darwin-arm64": "0.16.2", "@miden-sdk/node-darwin-x64": "0.16.2", "@miden-sdk/node-linux-x64-gnu": "0.16.2" } }, "sha512-xG/rUV6fDT8wM+HDkLUtlq5zph1d7Px4gW7VMMYSTfvOWgTiQfVKF7YRePvLxNk23qvG+rM/vN5rNkWrQ5o3/Q=="],
+    "@miden-sdk/miden-sdk": ["@miden-sdk/miden-sdk@0.17.6", "", { "dependencies": { "dexie": "^4.0.1", "glob": "^11.0.0" }, "optionalDependencies": { "@miden-sdk/node-darwin-arm64": "0.17.6", "@miden-sdk/node-darwin-x64": "0.17.6", "@miden-sdk/node-linux-x64-gnu": "0.17.6", "@miden-sdk/node-linux-x64-musl": "0.17.6" } }, "sha512-rHbOwVjNFkwtZS38l/ik2Cyclh5dM2EdoBAlcCauC9zu5ur3VviA4tfpSMCcRel8xEbB7XBpecM76OnrBCe4yQ=="],
 
-    "@miden-sdk/miden-wallet-adapter-base": ["@miden-sdk/miden-wallet-adapter-base@0.16.2", "", { "dependencies": { "eventemitter3": "^5.0.1" }, "peerDependencies": { "@miden-sdk/miden-sdk": "^0.16.2" } }, "sha512-qhR7dCzcfDMmDxJjH08slcEOEFO16n83lmsbDyT9pBRGJcrDatBQH1BNE4VlDtbhvKMeoEEBbsygZRj9g6KvEg=="],
+    "@miden-sdk/miden-wallet-adapter-base": ["@miden-sdk/miden-wallet-adapter-base@0.17.6", "", { "dependencies": { "eventemitter3": "^5.0.1" }, "peerDependencies": { "@miden-sdk/miden-sdk": "^0.17.6" } }, "sha512-Mo31GcdDyCyk1zCHyjahC04bJ7XlP0erCmbse5nmaX00a3pxDCNAsX6ubsfrRsvC7uuwnqGeOkfUIC7PcsMGqw=="],
 
-    "@miden-sdk/miden-wallet-adapter-miden": ["@miden-sdk/miden-wallet-adapter-miden@0.16.2", "", { "dependencies": { "@miden-sdk/miden-wallet-adapter-base": "0.16.2" }, "peerDependencies": { "@miden-sdk/miden-sdk": "^0.16.2", "typescript": "^5.0.0" } }, "sha512-Ewlhkh42sPVvzEL+Wm0V13QN8hmb3DlX7lDyFuJeWJ/N/J6R6p3yacw0qrILjYI1Z0b0kyVwAiGgv/gzG2qGTw=="],
+    "@miden-sdk/miden-wallet-adapter-miden": ["@miden-sdk/miden-wallet-adapter-miden@0.17.6", "", { "dependencies": { "@miden-sdk/miden-wallet-adapter-base": "0.17.6" }, "peerDependencies": { "@miden-sdk/miden-sdk": "^0.17.6", "typescript": "^5.0.0" } }, "sha512-W+Rribgbo1xw1E7JxfYsTDw2FlvlEEI+DqXKKweFDxMGHF5rEItw9bk5v/6hi8Xxgztk6q5OXbt0JFW1IVEAJA=="],
 
-    "@miden-sdk/miden-wallet-adapter-react": ["@miden-sdk/miden-wallet-adapter-react@0.16.2", "", { "dependencies": { "@miden-sdk/miden-wallet-adapter-base": "0.16.2", "@miden-sdk/miden-wallet-adapter-miden": "0.16.2" }, "peerDependencies": { "@miden-sdk/miden-sdk": "^0.16.2", "@miden-sdk/react": "^0.16.2", "@types/react": "^18.0.0 || ^19.0.0", "react": "^18.0.0 || ^19.0.0" }, "optionalPeers": ["@miden-sdk/react", "@types/react"] }, "sha512-SesOikm63bPNZqTrO4fCJzI10aiTvcmXUObaUjJlSwpcsnsgEYIg5afrjyc0BEi06vmCDxW3SBUXbkmo70SsAA=="],
+    "@miden-sdk/miden-wallet-adapter-react": ["@miden-sdk/miden-wallet-adapter-react@0.17.6", "", { "dependencies": { "@miden-sdk/miden-wallet-adapter-base": "0.17.6", "@miden-sdk/miden-wallet-adapter-miden": "0.17.6" }, "peerDependencies": { "@miden-sdk/miden-sdk": "^0.17.6", "@miden-sdk/react": "^0.17.6", "@types/react": "^18.0.0 || ^19.0.0", "react": "^18.0.0 || ^19.0.0" }, "optionalPeers": ["@miden-sdk/react", "@types/react"] }, "sha512-QJQ3xJRBjTt5TxYIsrrtUs64/qO22Woyz8ai1eqLNZzj/AoNZ5+Edi0Niffv5HbIqDCNo3R8uJV1M/4esAAj2Q=="],
 
-    "@miden-sdk/node-darwin-arm64": ["@miden-sdk/node-darwin-arm64@0.16.2", "", { "os": "darwin", "cpu": "arm64" }, "sha512-I+1y6YEbP6vXRXZxAQZOo53FhH285tt2WSeObgoMulR/oDb+qRmmhyFxJGBRg683A/kpEx1oUZKWjgODuM3Ykg=="],
+    "@miden-sdk/node-darwin-arm64": ["@miden-sdk/node-darwin-arm64@0.17.6", "", { "os": "darwin", "cpu": "arm64" }, "sha512-YAv9x7KaNxAG395N/KtJUpfQztlEL25zerYPh1ZX4Lh2a5cnpz0gi1u4Ru9uNNF1YyshjmSxDuWeGeub2oV3yA=="],
 
-    "@miden-sdk/node-darwin-x64": ["@miden-sdk/node-darwin-x64@0.16.2", "", { "os": "darwin", "cpu": "x64" }, "sha512-2BHRQy7Pa0Hi09m91dAo5j+yWQdjaZKPxLOAQcKIp2Fi8GpDLQ/fQDyYUMDY2UBgpBDkhy+ojFLYuXH3SNDhNw=="],
+    "@miden-sdk/node-darwin-x64": ["@miden-sdk/node-darwin-x64@0.17.6", "", { "os": "darwin", "cpu": "x64" }, "sha512-Ioh6lps+MhyesuIrSR+GejCoKUr+PTlr7/jeMvfFMTAgFE2xfs3HI3ij/0yvVrd5FPNtKnql1qNPidTeqt+qhw=="],
 
-    "@miden-sdk/node-linux-x64-gnu": ["@miden-sdk/node-linux-x64-gnu@0.16.2", "", { "os": "linux", "cpu": "x64" }, "sha512-MjJhfDRo+HqtuLeCOd6k/1Yb47j+jbyqIzv7LB8/bBZ4BAgVb1kzB2mmvOz5Vrk0xQCxuFiB4gaVZmSTiy3QOg=="],
+    "@miden-sdk/node-linux-x64-gnu": ["@miden-sdk/node-linux-x64-gnu@0.17.6", "", { "os": "linux", "cpu": "x64" }, "sha512-Dm5OdXN61PU+zuNrfdDdolFWcWv2ufXsDiysAyO2Uy0+Cxcr2C38sYF6DVBYedSpcVQbZ/weGtx3C3cCS6P+zg=="],
 
-    "@miden-sdk/react": ["@miden-sdk/react@0.16.2", "", { "dependencies": { "zustand": "^5.0.0" }, "peerDependencies": { "@miden-sdk/miden-sdk": "^0.16.2", "@types/react": ">=18.0.0", "react": ">=18.0.0" }, "optionalPeers": ["@types/react"] }, "sha512-MIzbnxHMfEvHGE5MRxMcaQNmDcGq4LXrSSm5i+nkqRM8saC79TVMW6Zyj9Eb7IgzmkkCrbC9uNEVcN6ZNfK9Pw=="],
+    "@miden-sdk/node-linux-x64-musl": ["@miden-sdk/node-linux-x64-musl@0.17.6", "", { "os": "linux", "cpu": "x64" }, "sha512-8b+ZWA7aHl992M2IY0XFJoo1BUn84tnviH1v7rxhjQSq+Aq8aPY/+dMB8HaBacMDRXQ27Gj80ktJnDnCDd7MVg=="],
+
+    "@miden-sdk/react": ["@miden-sdk/react@0.17.6", "", { "dependencies": { "zustand": "^5.0.0" }, "peerDependencies": { "@miden-sdk/miden-sdk": "^0.17.6", "@types/react": ">=18.0.0", "react": ">=18.0.0" }, "optionalPeers": ["@types/react"] }, "sha512-H0cUFzcmRtzjbg63qZp8whdlJfQfVO29CPLiN+7xaZCseSBRsndenv61G5lrXOuI2jiXj7YbUS69plPpMNDNOg=="],
 
     "@napi-rs/wasm-runtime": ["@napi-rs/wasm-runtime@1.2.2", "", { "dependencies": { "@tybys/wasm-util": "^0.10.3" }, "peerDependencies": { "@emnapi/core": "^1.7.1 || ^2.0.0-alpha.3", "@emnapi/runtime": "^1.7.1 || ^2.0.0-alpha.3" } }, "sha512-JfB4kuJQjaoHuCTseIINHtHWeJnvgEcxjwA5t/Y00ZgaOO1Crz3fjT/p8kT28zA/Caz7oiUMn3d6H2yOVCVwuw=="],
 

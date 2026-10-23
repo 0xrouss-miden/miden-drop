@@ -12,6 +12,8 @@ const ERR_DROP_NOTE_PARTIAL_CONDITION="Miden Drop must zero every Oracle field w
 const ERR_DROP_NOTE_SENDER_LOCKED="Miden Drop sender cannot claim before the recovery block"
 const ERR_DROP_NOTE_RECIPIENT_EXPIRED="Miden Drop expired and can only be reclaimed by its sender"
 const ERR_DROP_NOTE_PRICE_UNAVAILABLE="Pragma pair is not tracked or has no fresh publisher value"
+const ERR_DROP_NOTE_PRICE_DECIMALS="Pragma price decimals do not match the drop target"
+const ERR_DROP_NOTE_PRICE_STALE="Pragma price timestamp is outside the 120-second freshness window"
 const ERR_DROP_NOTE_PRICE_TOO_LOW="Pragma price has not reached the Miden Drop target"
 
 #! Miden Drop optionally price-gated bearer note.
@@ -22,8 +24,8 @@ const ERR_DROP_NOTE_PRICE_TOO_LOW="Pragma price has not reached the Miden Drop t
 #! original sender may recover it.
 #!
 #! Pragma deployment pinned by this script:
-#! - Oracle: 0x3b306d819a19b691205480e1619b5c
-#! - get_median: 0xab62a61417fb6c1edc191d24b6a3cc53b2071e671d7013ddd26860267b960b29
+#! - Oracle: 0x8f8d747477ca171144feadc60a1137
+#! - get_median: 0x633ac6865a1c4c27f065c07439d59bffdcd931ed9a706abbe2ae70dcd76031ac
 #!
 #! Requires the consuming account to expose the standard Basic Wallet `receive_asset` procedure.
 #!
@@ -56,7 +58,7 @@ pub proc claim
     end
 
     # The recovery block is an exclusive boundary: recipient before, sender from it onward.
-    mem_load.0 exec.tx::get_block_number lte
+    mem_load.0 exec.tx::get_reference_block_number lte
     if.true
         exec.active_account::get_id
         exec.active_note::get_sender
@@ -70,23 +72,35 @@ pub proc claim
         # A zero pair prefix marks a plain bearer drop and skips all foreign-account work.
         mem_load.1 eq.0
         if.false
-            # Pragma get_median inputs: [pair_prefix, pair_suffix, amount=0, reserved=0, pad(12)].
+            # Oracle v1 takes the Poseidon2 hash of the canonical pair name.
+            # The note's compact pair selectors remain 1 (BTC/USD) and 2 (ETH/USD).
             padw padw padw
-            push.0.0 mem_load.2 mem_load.1
+            mem_load.1 eq.1
+            if.true
+                push.0xd189b4e9c38c367ba926ddb0044b781ca8fff18dcc10a0c75ff5600a1eb4d0eb
+            else
+                push.0x9a50f4137c634e0b384a87bea3a186e578e21274af6ae752230ead4631233e1d
+            end
 
             # Select Pragma get_median and its deployed public Oracle account.
-            push.0xab62a61417fb6c1edc191d24b6a3cc53b2071e671d7013ddd26860267b960b29
-            push.4265029250523444881.2329628612750957568
+            push.0x633ac6865a1c4c27f065c07439d59bffdcd931ed9a706abbe2ae70dcd76031ac
+            push.10344051962714658577.4971602104747636480
             exec.tx::execute_foreign_procedure
 
-            # Outputs begin [is_tracked, median_price, amount=0, pad(13)].
-            push.1 assert_eq.err=ERR_DROP_NOTE_PRICE_UNAVAILABLE
+            # Oracle v1 returns [num_publishers, median_price, decimals, last_updated, pad(12)].
+            # Cedar currently has one registered publisher. A paused/empty/stale
+            # oracle returns no publishers, so it can never authorize a claim.
+            eq.0 assertz.err=ERR_DROP_NOTE_PRICE_UNAVAILABLE
+            swap push.8 assert_eq.err=ERR_DROP_NOTE_PRICE_DECIMALS
 
-            # `lte` compares the second felt to the first, so [median, target] proves target <= median.
+            # `lte` compares the second felt to the first: target <= median.
             mem_load.3 swap lte assert.err=ERR_DROP_NOTE_PRICE_TOO_LOW
 
-            # Remove the fourteen unused padded outputs left by the FPI call.
-            dropw dropw dropw drop drop
+            # Check the reported timestamp independently of the oracle's filtering.
+            dup eq.0 assertz.err=ERR_DROP_NOTE_PRICE_STALE
+            exec.tx::get_block_timestamp swap sub
+            push.120 lte assert.err=ERR_DROP_NOTE_PRICE_STALE
+            dropw dropw dropw
         end
     end
 
