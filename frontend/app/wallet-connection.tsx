@@ -7,6 +7,7 @@ import {
 } from "@miden-sdk/miden-wallet-adapter-base";
 import { useWallet } from "@miden-sdk/miden-wallet-adapter-react";
 import { MIDEN_WALLET_NETWORK } from "@/lib/miden/network";
+import { walletApprovalMessage } from "@/lib/miden/wallet-errors";
 
 function shortAddress(address?: string | null) {
   if (!address) return "Connected";
@@ -37,7 +38,7 @@ export function useWalletConnection() {
       AllowedPrivateData.Assets,
     )
       .catch((connectionError: unknown) => {
-        setError(connectionError instanceof Error ? connectionError.message : "Could not connect to the wallet.");
+        setError(walletApprovalMessage(connectionError, "connect") ?? (connectionError instanceof Error ? connectionError.message : "Could not connect to the wallet."));
       })
       .finally(() => setConnectRequested(false));
   }, [connect, connectRequested, wallet]);
@@ -61,7 +62,7 @@ export function useWalletConnection() {
         AllowedPrivateData.Assets,
       );
     } catch (connectionError) {
-      setError(connectionError instanceof Error ? connectionError.message : "Could not connect to the wallet.");
+      setError(walletApprovalMessage(connectionError, "connect") ?? (connectionError instanceof Error ? connectionError.message : "Could not connect to the wallet."));
     }
   }
 
@@ -72,7 +73,7 @@ export function useWalletConnection() {
     try {
       await disconnect();
     } catch (disconnectError) {
-      setError(disconnectError instanceof Error ? disconnectError.message : "Could not disconnect the wallet. Try again.");
+      setError(walletApprovalMessage(disconnectError, "disconnect") ?? (disconnectError instanceof Error ? disconnectError.message : "Could not disconnect the wallet. Try again."));
     }
   }
 

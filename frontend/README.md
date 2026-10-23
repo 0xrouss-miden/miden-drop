@@ -8,6 +8,16 @@ bun run db:migrate
 bun run dev
 ```
 
+## Mini app experience
+
+The primary experience is a compact workspace inside Bread Wallet, using the existing Miden wallet adapter. Direct URL access uses the same UI and connection flow. `/` and `/send` share the composer; `/receive` accepts private links and `/claim#v1…` continues to open bearer drops. The persistent root provider preserves the wallet session between routes.
+
+Recovery timing, private messages, and price conditions live in Drop options. A created drop opens a sharing view with native Web Share when available, clipboard fallback, a selectable link, and a QR disclosure. Secrets stay in memory and in the bearer link; this UI adds no persistent drop history.
+
+## Motion
+
+`app/motion.tsx` owns the Motion for React provider and reusable controls, disclosures, feedback, and note-status marks. Shared navigation uses layout animation; transaction logic and wallet mounting are independent of animation. All motion respects reduced-motion preferences, including custom SVG and disclosure effects. Keep the `m` imports from `motion/react-m` inside the strict LazyMotion provider.
+
 ## Miden integration
 
 - `lib/miden/drop-client.ts` compiles the canonical note script, builds a private output note, and asks the connected wallet to submit it. Complete `Note` bytes are encrypted in the drop envelope.

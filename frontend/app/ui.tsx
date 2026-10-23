@@ -1,11 +1,15 @@
 import type { ReactNode } from "react";
 import Image from "next/image";
 
-export type IconName = "arrow" | "back" | "check" | "copy" | "lock" | "scan" | "wallet";
+export type IconName = "arrow" | "back" | "check" | "copy" | "lock" | "scan" | "wallet" | "chevron" | "send" | "receive" | "share";
 
 export function Icon({ name, size = 20 }: { name: IconName; size?: number }) {
   const paths: Record<IconName, ReactNode> = {
     arrow: <><path d="M5 12h14" /><path d="m14 7 5 5-5 5" /></>,
+    chevron: <path d="m7 10 5 5 5-5" />,
+    send: <><path d="M12 16V3m-5 5 5-5 5 5" /><path d="M5 14v6h14v-6" /></>,
+    receive: <><path d="M12 3v13m-5-5 5 5 5-5" /><path d="M5 17v3h14v-3" /></>,
+    share: <><path d="M12 15V3m-4 4 4-4 4 4" /><path d="M7 10H4v11h16V10h-3" /></>,
     back: <><path d="M19 12H5" /><path d="m10 7-5 5 5 5" /></>,
     check: <path d="m5 12 4 4L19 6" />,
     copy: <><rect x="8" y="8" width="11" height="11" rx="1" /><path d="M16 8V5H5v11h3" /></>,

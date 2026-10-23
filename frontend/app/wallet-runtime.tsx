@@ -8,6 +8,7 @@ import {
 import { MidenWalletAdapter } from "@miden-sdk/miden-wallet-adapter-miden";
 import { WalletProvider } from "@miden-sdk/miden-wallet-adapter-react";
 import { MIDEN_WALLET_NETWORK } from "@/lib/miden/network";
+import { reportWalletError } from "@/lib/miden/wallet-errors";
 
 const wallets = [new MidenWalletAdapter({ appName: "Miden Drop" })];
 
@@ -18,6 +19,7 @@ export default function WalletRuntime({ children }: { children: ReactNode }) {
       network={MIDEN_WALLET_NETWORK}
       privateDataPermission={PrivateDataPermission.Auto}
       allowedPrivateData={AllowedPrivateData.Assets}
+      onError={reportWalletError}
       localStorageKey="miden-drop-wallet-mainnet-v0.17"
       autoConnect
     >

@@ -1,6 +1,6 @@
 import { readFileSync } from "node:fs";
 import { beforeAll, describe, expect, it, vi } from "vitest";
-import type { MidenTransaction } from "@miden-sdk/miden-wallet-adapter-base";
+import { WalletTransactionError, type MidenTransaction } from "@miden-sdk/miden-wallet-adapter-base";
 import * as sdk from "@miden-sdk/miden-sdk/lazy";
 
 import { createMidenDrop } from "./drop-client";
@@ -28,6 +28,23 @@ beforeAll(() => {
 });
 
 describe("drop creation wallet requests", () => {
+  it("propagates NOT_GRANTED without polling or automatically retrying the transaction", async () => {
+    const refusal = new WalletTransactionError("NOT_GRANTED");
+    const wallet = {
+      address: "0x3b306d819a19b691205480e1619b5c",
+      requestGuardianInfo: vi.fn().mockResolvedValue({ isGuardianAccount: false }),
+      requestTransaction: vi.fn().mockRejectedValue(refusal),
+      waitForTransaction: vi.fn(),
+    };
+
+    await expect(createMidenDrop({
+      wallet, amount: BigInt(100), expirationDays: 1, blocksPerDay: 28800,
+      faucetId: "0x18101fa522c174b165efd4f70a0385",
+    })).rejects.toBe(refusal);
+    expect(wallet.requestTransaction).toHaveBeenCalledOnce();
+    expect(wallet.waitForTransaction).not.toHaveBeenCalled();
+  });
+
   it.each([false, true])("preserves the private output note and guardian=%s fee salt", async (guardian) => {
     let outputNotes: sdk.Note[] = [];
     let salt: bigint[] | undefined;

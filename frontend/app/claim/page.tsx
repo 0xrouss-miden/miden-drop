@@ -12,7 +12,9 @@ import { claimMidenDrop, type ClaimProgress } from "@/lib/miden/claim-client";
 import { findMidenToken } from "@/lib/miden/config";
 import { getCurrentMidenBlock } from "@/lib/miden/drop-client";
 import { findMidenPricePair, formatMidenTargetPrice } from "@/lib/miden/price-pairs";
+import { walletApprovalMessage } from "@/lib/miden/wallet-errors";
 import { Icon } from "../ui";
+import { ActionButton, ErrorNotice, PendingMark, StatusLabel, SuccessMark } from "../motion";
 import { useWalletConnection } from "../wallet-connection";
 
 type ClaimPhase = "loading" | "ready" | "claiming" | "claimed" | "invalid" | "missing" | "failed";
@@ -111,16 +113,17 @@ export default function ClaimPage() {
     } catch (claimError) {
       setPhase("ready");
       const message = claimError instanceof Error ? claimError.message : "";
+      const approvalMessage = walletApprovalMessage(claimError, "claim");
       if (claimError instanceof IncompatibleMidenReleaseError) {
         setError(claimError.message);
+      } else if (approvalMessage) {
+        setError(approvalMessage);
       } else if (/consum|nullifier|already/iu.test(message)) {
         setError("This drop has already been claimed.");
       } else if (/price has not reached|not tracked|no fresh publisher/iu.test(message)) {
         setError("The current Oracle price has not reached this target yet. Try again after the market moves.");
       } else if (/expired|sender|recovery/iu.test(message)) {
         setError("The recovery window is open, but only the sender account can recover this drop.");
-      } else if (/not[_ ]?granted|reject|denied|cancel/iu.test(message)) {
-        setError("The wallet request was not approved. Retry and approve both the note import and the claim.");
       } else {
         setError(message || "The wallet could not claim this drop. Sync the wallet and try again.");
       }
@@ -128,21 +131,21 @@ export default function ClaimPage() {
   }
 
   return (
-    <main className="claim-page">
+    <main className="claim-page" id="main-content">
       <section className="claim-task">
-        <h1>{pageTitle}<span>.</span></h1>
-        {(error || connectionError) && <div className="error-banner" role="alert">{error || connectionError}</div>}
+        <div className="task-intro"><Link className="back-link" href="/receive"><Icon name="back" size={18} />Receive</Link><h1>{pageTitle}<span>.</span></h1></div>
+        <ErrorNotice message={error || connectionError} />
 
         {phase === "loading" ? (
           <section className="claim-surface claim-loading clipped-surface" aria-live="polite">
-            <span className="loading-mark" aria-hidden="true" />
+            <PendingMark />
             <strong>Opening the encrypted drop…</strong>
             <p>The note is being decrypted on this device.</p>
           </section>
         ) : phase === "claimed" ? (
           <section className="claim-surface clipped-surface">
-            <div className="success-state" role="status"><span><Icon name="check" /></span><div><strong>{completedAsRecovery ? "Funds recovered" : "Funds received"}</strong><p>The private note was consumed by your wallet on Miden Mainnet (Cedar).</p></div></div>
-            <Link className="primary-button claim-complete-action" href="/">Return home <Icon name="arrow" /></Link>
+            <div className="success-state" role="status"><SuccessMark /><div><strong>{completedAsRecovery ? "Funds recovered" : "Funds received"}</strong><p>The private note was consumed by your wallet on Miden Mainnet (Cedar).</p></div></div>
+            <Link className="primary-button claim-complete-action" href="/">Create a drop <Icon name="arrow" /></Link>
           </section>
         ) : details ? (
           <section className="claim-surface clipped-surface" aria-labelledby="claim-details-title">
@@ -152,16 +155,16 @@ export default function ClaimPage() {
             </div>
             <dl className="detail-list">
               <div><dt>From</dt><dd>Private sender</dd></div>
-              <div><dt>Claim condition</dt><dd>{details.pricePair ? `${details.pricePair} ≥ ${details.targetPrice}` : "Bearer link · no Oracle"}</dd></div>
+              <div><dt>Claim condition</dt><dd>{details.pricePair ? `${details.pricePair} ≥ ${details.targetPrice}` : "Anyone with the link"}</dd></div>
               <div><dt>Network</dt><dd><span className="status-dot" />Miden Mainnet (Cedar)</dd></div>
               <div><dt>Sender recovery</dt><dd>{details.expired ? "Open now" : `Block ${details.expirationBlock.toLocaleString()}`}</dd></div>
               <div><dt>Message</dt><dd>{details.message || "No message"}</dd></div>
             </dl>
-            <button className="primary-button claim-button" type="button" onClick={claimDrop} disabled={phase === "claiming" || pending} aria-busy={phase === "claiming"}>
-              <span>{phase === "claiming" ? claimProgressLabel(claimProgress, details.expired) : connected ? details.expired ? "Recover to sender wallet" : details.pricePair ? "Check price & claim" : "Claim drop" : pending ? "Connecting wallet…" : details.expired ? "Connect sender wallet to recover" : "Connect wallet to claim"}</span>
-              <Icon name={phase === "claiming" ? "lock" : "arrow"} />
-            </button>
-            <p className="prototype-note"><Icon name="lock" size={14} /> {details.expired ? "Only the creating account can recover after this block." : details.pricePair ? `Pragma checks ${details.pricePair} inside the claim proof.` : "No Oracle check; possession of this private link grants the claim."}</p>
+            <ActionButton className="primary-button claim-button" type="button" onClick={claimDrop} disabled={phase === "claiming" || pending} aria-busy={phase === "claiming"}>
+              <StatusLabel state={`${phase}-${claimProgress}-${connected}-${pending}`}>{phase === "claiming" ? claimProgressLabel(claimProgress, details.expired) : connected ? details.expired ? "Recover to sender wallet" : details.pricePair ? "Check price & claim" : "Claim drop" : pending ? "Connecting wallet…" : details.expired ? "Connect sender wallet to recover" : "Connect wallet to claim"}</StatusLabel>
+              {phase === "claiming" || pending ? <PendingMark /> : <Icon name="arrow" />}
+            </ActionButton>
+            <p className="privacy-note"><Icon name="lock" size={15} /> {details.expired ? "Only the sender’s wallet can recover this drop." : details.pricePair ? `The price condition is verified when you claim.` : "Approve in Bread to receive this private note."}</p>
           </section>
         ) : (
           <section className="claim-surface claim-unavailable clipped-surface">

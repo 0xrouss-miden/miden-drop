@@ -3,6 +3,7 @@
 import { FormEvent, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Icon } from "../ui";
+import { ActionButton, ErrorNotice } from "../motion";
 
 export default function ReceivePage() {
   const router = useRouter();
@@ -23,20 +24,22 @@ export default function ReceivePage() {
   }
 
   return (
-    <main className="receive-page">
+    <main className="receive-page" id="main-content">
       <section className="receive-section">
-        <div className="section-intro">
+        <div className="task-intro">
           <h1>Receive a drop<span>.</span></h1>
+          <p>Paste a private link to see what’s inside.</p>
         </div>
-        {error && <div className="error-banner" role="alert">{error}</div>}
-        <div className="receive-workspace clipped-surface" aria-live="polite">
+        <ErrorNotice id="link-error" message={error} />
+        <div className="receive-workspace">
           <form className="paste-form" onSubmit={reviewDrop}>
             <label htmlFor="claim-link">Private drop link</label>
-            <input id="claim-link" type="text" inputMode="url" autoComplete="off" spellCheck={false} value={link} onChange={(event) => setLink(event.target.value)} placeholder="https://drop.miden.xyz/claim#v1…" />
-            <button className="primary-button" type="submit" disabled={!link.trim()}><span>Review drop</span><Icon name="arrow" /></button>
-            <p><Icon name="lock" size={14} /> The secret stays on this device while the drop is opened.</p>
+            <textarea id="claim-link" rows={3} inputMode="url" autoCapitalize="none" autoComplete="off" spellCheck={false} value={link} onChange={(event) => { setLink(event.target.value); setError(null); }} placeholder="Paste your drop link here" aria-invalid={!!error} aria-describedby={error ? "link-error" : undefined} />
+            <ActionButton className="primary-button" type="submit" disabled={!link.trim()}><span>Review drop</span><Icon name="arrow" /></ActionButton>
+            <p className="privacy-note"><Icon name="lock" size={15} />Review first. Nothing is claimed until you approve.</p>
           </form>
         </div>
+        <p className="receive-help">Already have a drop link in a message? Open it directly to review and claim.</p>
       </section>
     </main>
   );
